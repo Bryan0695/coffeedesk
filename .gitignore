@@ -1,12 +1,17 @@
 # Credenciales reales (nunca al repositorio)
 config/credenciales.php
 
+# Logs de PHP (la carpeta sí se versiona, con su .htaccess)
+logs/*
+!logs/.htaccess
+!logs/.gitkeep
+
 # Sistema / editores
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Evidencias pesadas (se entregan aparte)
+# Evidencias pesadas y paquetes de despliegue (se entregan aparte)
 *.mp4
 *.zip

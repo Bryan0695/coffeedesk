@@ -1,17 +1,19 @@
 <?php
 /**
- * PLANTILLA de credenciales.
+ * PLANTILLA de credenciales para XAMPP (local).
  *
  * 1. Copia este archivo como  config/credenciales.php
- * 2. Rellena los datos del bloque "hosting" con los que te da InfinityFree
- *    (Panel > MySQL Databases).
+ * 2. Ajusta los datos si tu MySQL no es el de XAMPP por defecto.
  *
+ * Para el hosting usa config/credenciales.hosting.example.php.
  * config/credenciales.php está en .gitignore: NUNCA se sube al repositorio.
  */
 
 return [
-    // XAMPP en tu computadora
-    'local' => [
+    // 'local' muestra los errores en pantalla; 'hosting' los oculta y los registra en logs/
+    'entorno' => 'local',
+
+    'bd' => [
         'host'     => 'localhost',
         'usuario'  => 'root',
         'clave'    => '',            // XAMPP trae root sin contraseña
@@ -20,13 +22,6 @@ return [
         'base_url' => '/coffeedesk', // carpeta dentro de htdocs
     ],
 
-    // InfinityFree
-    'hosting' => [
-        'host'     => 'sqlXXX.infinityfree.com', // "MySQL Hostname"
-        'usuario'  => 'if0_XXXXXXXX',            // "MySQL Username"
-        'clave'    => 'CAMBIAR',                 // contraseña de la cuenta de hosting
-        'base'     => 'if0_XXXXXXXX_coffeedesk', // "MySQL DB Name"
-        'puerto'   => 3306,
-        'base_url' => '',                        // la app va directo en htdocs
-    ],
+    // Redirige http:// → https://. En local siempre false.
+    'forzar_https' => false,
 ];

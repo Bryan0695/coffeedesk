@@ -1,3 +1,11 @@
-# Bloquea el acceso directo por navegador a carpetas internas
-RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|php/partials)/
+# Bloquea el acceso directo por navegador a carpetas y archivos internos (F-008)
 Options -Indexes
+
+# Carpetas que solo se incluyen desde PHP o no deben publicarse
+RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials)/
+# Librerías de autenticación (solo se incluyen; los endpoints son login, logout y estado)
+RedirectMatch 403 ^/?(.*/)?php/auth/(sesion|csrf|autorizacion|arranque_sesion|limite_intentos)\.php$
+# Archivos y carpetas ocultos: .git/, .github/, .env, .htaccess, .gitignore…
+RedirectMatch 403 (?i)/\.(git|env|ht)
+# Documentación, scripts y logs sueltos (README.md, *.sql, *.sh, *.yml…)
+RedirectMatch 403 (?i)\.(md|sql|log|sh|yml|example\.php)$
