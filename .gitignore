@@ -1,0 +1,12 @@
+# Credenciales reales (nunca al repositorio)
+config/credenciales.php
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Evidencias pesadas (se entregan aparte)
+*.mp4
+*.zip

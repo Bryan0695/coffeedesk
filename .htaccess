@@ -1,0 +1,3 @@
+# Bloquea el acceso directo por navegador a carpetas internas
+RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|php/partials)/
+Options -Indexes
