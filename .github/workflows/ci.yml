@@ -1,0 +1,111 @@
+# CoffeeDesk — integración continua (F-018)
+# 1) Sintaxis en la versión más antigua soportada (XAMPP, 8.0) y en una reciente.
+# 2) Control de acceso: todo endpoint llama a requiere_*().
+# 3) Pruebas de integración con MySQL 8 real y el servidor embebido de PHP.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint y endpoints (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring
+          coverage: none
+
+      - name: php -l en todos los archivos
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Todo endpoint llama a requiere_*()
+        run: php tests/verificar_endpoints.php
+
+  integracion:
+    name: Integración (PHP 8.0 + MySQL 8.0)
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: coffeedesk
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL: mysql -h 127.0.0.1 -P 3306 -uroot -proot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mysqli, mbstring
+          coverage: none
+
+      - name: Importar esquema (0X_) y datos de prueba (90_)
+        run: |
+          for f in sql/0*.sql sql/90_*.sql; do
+            echo "== $f"
+            $MYSQL coffeedesk < "$f"
+          done
+          # Usuario de la app con mysql_native_password (compatible con mysqlnd de PHP 8.0)
+          $MYSQL -e "CREATE USER 'coffeedesk'@'%' IDENTIFIED WITH mysql_native_password BY 'clave_ci';
+                     GRANT ALL PRIVILEGES ON coffeedesk.* TO 'coffeedesk'@'%';"
+          $MYSQL coffeedesk -e "SELECT * FROM esquema_version;"
+
+      - name: Reimportar 01 debe fallar (versionado del esquema, F-016)
+        run: |
+          if $MYSQL coffeedesk < sql/01_usuarios_roles.sql; then
+            echo "El 01 se reimportó sin error: el control de versiones no funciona"; exit 1
+          fi
+
+      - name: credenciales.php de CI
+        run: |
+          cat > config/credenciales.php <<'PHP'
+          <?php
+          return [
+              'entorno' => 'local',
+              'bd' => [
+                  'host' => '127.0.0.1', 'usuario' => 'coffeedesk', 'clave' => 'clave_ci',
+                  'base' => 'coffeedesk', 'puerto' => 3306, 'base_url' => '',
+              ],
+              'forzar_https' => false,
+          ];
+          PHP
+
+      - name: Levantar php -S
+        run: |
+          php -S 127.0.0.1:8000 > /tmp/php-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null http://127.0.0.1:8000/index.php && exit 0
+            sleep 1
+          done
+          echo "php -S no respondió"; cat /tmp/php-server.log; exit 1
+
+      - name: Pruebas de integración
+        env:
+          MYSQL_CMD: mysql -h 127.0.0.1 -P 3306 -uroot -proot coffeedesk
+        run: bash tests/integracion.sh http://127.0.0.1:8000
+
+      - name: Logs si algo falló
+        if: failure()
+        run: |
+          echo "== logs/php_error.log"; cat logs/php_error.log || true
+          echo "== php -S"; cat /tmp/php-server.log || true
