@@ -5,6 +5,7 @@
 -- Local:   selecciona la base "coffeedesk" en phpMyAdmin e importa.
 -- Hosting: selecciona la base if0_..._coffeedesk en phpMyAdmin e importa.
 -- (Este archivo no usa CREATE DATABASE ni USE, así sirve en ambos.)
+-- Probado en MySQL 8.0 (modo estricto). INSERT IGNORE permite re-importarlo sin duplicar.
 -- =========================================================
 
 SET NAMES utf8mb4;
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     usuario       VARCHAR(30)      NOT NULL,
     clave_hash    VARCHAR(255)     NOT NULL,      -- resultado de password_hash()
     rol_id        TINYINT UNSIGNED NOT NULL,
-    activo        TINYINT(1)       NOT NULL DEFAULT 1,
+    activo        TINYINT UNSIGNED NOT NULL DEFAULT 1, -- 1 = activo, 0 = inactivo
     ultimo_acceso DATETIME         NULL,
     creado_en     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -34,18 +35,16 @@ CREATE TABLE IF NOT EXISTS usuarios (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---- Datos iniciales ----------------------------------------------------
-INSERT INTO roles (id, nombre, descripcion) VALUES
+INSERT IGNORE INTO roles (id, nombre, descripcion) VALUES
     (1, 'administrador', 'Acceso total: menú, inventario, pedidos'),
-    (2, 'mesero',        'Registra pedidos y consulta el menú')
-ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
+    (2, 'mesero',        'Registra pedidos y consulta el menú');
 
 -- Usuarios de prueba (CAMBIAR contraseñas antes de la defensa si se desea)
 --   admin  / Admin123*
 --   mesero / Mesero123*
 -- Hashes generados con: php herramientas/generar_hash.php "Admin123*"
-INSERT INTO usuarios (nombre, usuario, clave_hash, rol_id) VALUES
+INSERT IGNORE INTO usuarios (nombre, usuario, clave_hash, rol_id) VALUES
     ('Administrador General', 'admin',
      '$2y$12$DKjU805WxhgDnmIVt7Fb7.TKI3NewpJ4DfA5sEifHZfOBdOdqSUu.', 1),
     ('Mesero de Turno', 'mesero',
-     '$2y$12$YPhKy1mm4YekSlCEAlXj.ed2QibyDM.vxX9GwMNZgUfhXnscm8hs6', 2)
-ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
+     '$2y$12$YPhKy1mm4YekSlCEAlXj.ed2QibyDM.vxX9GwMNZgUfhXnscm8hs6', 2);

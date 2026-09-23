@@ -12,6 +12,10 @@ UEES · Desarrollo de Aplicaciones Web · Examen del Segundo Parcial.
 
 ---
 
+**Stack:** HTML5 · CSS3 · JavaScript · PHP 8 (mysqli) · **MySQL 8**
+
+> **Sobre la base de datos:** el proyecto usa **MySQL**. El script SQL y el login se probaron en **MySQL 8.0** en modo estricto, sin advertencias. Ojo: las versiones recientes de XAMPP traen MariaDB, que es compatible con MySQL, así que el mismo script funciona en local sin cambios. Para no romper esa compatibilidad, no uses sintaxis exclusiva de MariaDB ni de MySQL 8 (por ejemplo `INSERT … AS alias`).
+
 ## 1. Estructura del proyecto
 
 ```
