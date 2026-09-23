@@ -5,6 +5,8 @@
 # Documentación interna / auditorías
 docs/audits/
 docs/evidencias/
+docs/despliegue_infinityfree.md
+docs/plan_pruebas.md
 
 # Logs
 logs/*
@@ -50,3 +52,8 @@ build/
 
 # Documentación local opcional
 .docs/
+
+# Paquete de despliegue y archivos pesados
+coffeedesk-deploy.zip
+*.zip
+*.mp4
