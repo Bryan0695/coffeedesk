@@ -5,11 +5,15 @@
  *
  * Antes de incluirla, la página debe definir:
  *   $tituloPagina = 'Menú';
- * y haber llamado a requiere_login() o requiere_rol().
+ * y llamar a requiere_login() o requiere_rol(). Si se olvida, la cabecera
+ * exige igualmente una sesión iniciada.
  *
  * Responsable: Bryan Gallegos (menú por rol) · Frederick (estilos)
  */
 
+if (usuario_actual() === null) {
+    requiere_login();
+}
 $u = usuario_actual();
 $paginaActual = basename($_SERVER['SCRIPT_NAME']);
 
@@ -20,15 +24,9 @@ $enlaces = [
     ['menu.php',       'Menú',       [ROL_ADMIN, ROL_MESERO]],
     ['inventario.php', 'Inventario', [ROL_ADMIN]],
 ];
+
+require __DIR__ . '/head.php';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= e($tituloPagina ?? 'CoffeeDesk') ?> | CoffeeDesk</title>
-    <link rel="stylesheet" href="<?= e(url('css/estilos.css')) ?>">
-</head>
 <body>
     <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
 

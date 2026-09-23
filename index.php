@@ -14,15 +14,10 @@ if (usuario_actual() !== null) {
 
 $usuarioPrevio = $_SESSION['login_usuario_previo'] ?? '';
 unset($_SESSION['login_usuario_previo']);
+
+$tituloPagina = 'Iniciar sesión';
+require __DIR__ . '/php/partials/head.php';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión | CoffeeDesk</title>
-    <link rel="stylesheet" href="<?= e(url('css/estilos.css')) ?>">
-</head>
 <body class="pagina-login">
     <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
 
@@ -46,6 +41,7 @@ unset($_SESSION['login_usuario_previo']);
                        value="<?= e($usuarioPrevio) ?>"
                        autocomplete="username" required
                        minlength="3" maxlength="30"
+                       pattern="<?= e(PATRON_USUARIO) ?>"
                        aria-describedby="error-usuario">
                 <p class="error-campo" id="error-usuario" aria-live="polite"></p>
             </div>
@@ -66,9 +62,7 @@ unset($_SESSION['login_usuario_previo']);
         </form>
     </main>
 
-    <footer class="pie">
-        <p>&copy; <?= date('Y') ?> CoffeeDesk · UEES · Desarrollo de Aplicaciones Web</p>
-    </footer>
+<?php require __DIR__ . '/php/partials/pie_pagina.php'; ?>
 
     <script src="<?= e(url('js/login.js')) ?>"></script>
 </body>

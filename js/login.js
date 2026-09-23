@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const campoClave = document.getElementById('clave');
     const botonVer = document.getElementById('ver-clave');
 
-    const PATRON_USUARIO = /^[A-Za-z0-9._-]{3,30}$/;
+    // La regla viene del atributo pattern (definida una sola vez en config/constantes.php)
+    const PATRON_USUARIO = new RegExp('^(?:' + campoUsuario.getAttribute('pattern') + ')$');
 
     function marcarError(campo, texto) {
         const error = document.getElementById('error-' + campo.id);
