@@ -5,21 +5,26 @@ Cada prueba se ejecuta en **local (XAMPP)** y en **hosting (InfinityFree)**; se 
 
 Estado: ✔ pasa · ✖ falla · — pendiente
 
+Última ejecución local: **2026-09-23**, rama `fix/auditoria-2026-09-23`, Apache + PHP 8.0.30 de XAMPP, MariaDB 10.4, base `coffeedesk_prueba`. Los casos marcados con *(auto)* los ejecuta `tests/integracion.sh`; los demás se ejecutaron a mano. P-02, P-11 y P-12 siguen pendientes de revisión manual en el navegador.
+
 ## Autenticación y roles (Bryan)
 | ID | Caso | Pasos | Resultado esperado | Local | Hosting |
 |---|---|---|---|:---:|:---:|
-| P-01 | Acceso sin sesión | Abrir `/panel.php` sin haber ingresado | Redirige al login con aviso "Inicia sesión para continuar" | ✔ | — |
+| P-01 | Acceso sin sesión *(auto)* | Abrir `/panel.php` sin haber ingresado | Redirige al login con aviso "Inicia sesión para continuar" | ✔ | — |
 | P-02 | Campos vacíos (cliente) | Pulsar *Ingresar* con campos vacíos | Mensajes bajo cada campo, foco en el primero con error, no se envía | — | — |
-| P-03 | Usuario con caracteres inválidos (servidor) | Enviar usuario `a'` | Mensaje de error de formato | ✔ | — |
-| P-04 | Contraseña incorrecta | `admin` / `mala` | "Usuario o contraseña incorrectos" | ✔ | — |
-| P-05 | Login administrador | `admin` / `Admin123*` | Panel de administración, ve Inventario | ✔ | — |
-| P-06 | Login mesero | `mesero` / `Mesero123*` | Panel de atención, no ve Inventario | ✔ | — |
-| P-07 | Mesero fuerza URL restringida | Como mesero abrir `/inventario.php` | Vuelve al panel con "No tienes permiso…" | ✔ | — |
-| P-08 | Cerrar sesión | Botón *Cerrar sesión* | Login con "Cerraste sesión correctamente"; `/panel.php` ya no abre | ✔ | — |
-| P-09 | Bloqueo por intentos | 5 contraseñas erróneas seguidas | "Demasiados intentos fallidos. Espera 5 minuto(s)" | ✔ | — |
+| P-03 | Usuario con caracteres inválidos (servidor) *(auto)* | Enviar usuario `a'` | Mensaje de error de formato | ✔ | — |
+| P-04 | Contraseña incorrecta *(auto)* | `admin` / `mala` | "Usuario o contraseña incorrectos" | ✔ | — |
+| P-05 | Login administrador *(auto)* | `admin` / `Admin123*` | Panel de administración, ve Inventario | ✔ | — |
+| P-06 | Login mesero *(auto)* | `mesero` / `Mesero123*` | Panel de atención, no ve Inventario | ✔ | — |
+| P-07 | Mesero fuerza URL restringida *(auto)* | Como mesero abrir `/inventario.php` | Vuelve al panel con "No tienes permiso…" | ✔ | — |
+| P-08 | Cerrar sesión *(auto)* | Botón *Cerrar sesión* | Login con "Cerraste sesión correctamente"; `/panel.php` ya no abre, **ni siquiera reutilizando la cookie anterior** | ✔ | — |
+| P-09 | Bloqueo por intentos *(auto)* | 5 contraseñas erróneas para `mesero`, **cada una con una cookie nueva** (ventana privada nueva, o `curl` sin reutilizar la cookie); luego un 6.º intento, también con cookie nueva y **con la contraseña correcta** | El 6.º intento no entra: "Demasiados intentos fallidos. Espera 5 minuto(s)" (borrar la cookie ya no evita el bloqueo) | ✔ | — |
 | P-10 | Contraseña cifrada | Ver tabla `usuarios` en phpMyAdmin | `clave_hash` empieza con `$2y$`, no se ve la clave | ✔ | — |
 | P-11 | Mostrar/ocultar contraseña | Botón *Mostrar* | Alterna texto visible, también con teclado (Tab + Enter) | — | — |
 | P-12 | Navegación por teclado | Solo Tab/Shift+Tab/Enter en login y panel | Foco visible en cada control, orden lógico, "Saltar al contenido" aparece | — | — |
+| P-13 | Hora de PHP = hora de MySQL | Comparar `date('Y-m-d H:i')` de PHP con `SELECT NOW()` hecho **a través de la app** (`consultar_uno`), o crear un registro y ver su hora | Misma hora (Ecuador, UTC-5), aunque el servidor MySQL esté en otra zona | ✔ | — |
+| P-14 | Cuenta desactivada con sesión abierta | Entrar como `mesero`; en phpMyAdmin `UPDATE usuarios SET activo = 0 WHERE usuario = 'mesero'`; esperar 61 s y recargar; luego reactivar | Vuelve al login con "Tu cuenta ya no tiene acceso. Contacta al administrador." | ✔ | — |
+| P-15 | Entradas tipo lista *(auto)* | Enviar al login `csrf[]=x`, o `usuario[]=admin&clave[]=x` con un token válido (con `curl`) | Redirige al login con mensaje de error (302), nunca error 500 | ✔ | — |
 
 ## Menú (Gabo)
 | ID | Caso | Resultado esperado | Local | Hosting |
