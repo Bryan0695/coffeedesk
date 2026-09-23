@@ -88,6 +88,8 @@ grep -qi '^x-frame-options: *deny' "$TMP/h" && ok "X-Frame-Options: DENY" || fal
 grep -qi "^content-security-policy:.*frame-ancestors 'none'" "$TMP/h" && ok "Content-Security-Policy con frame-ancestors 'none'" || fallo "Falta la CSP (modo enforce)"
 grep -qi '^x-content-type-options: *nosniff' "$TMP/h" && ok "X-Content-Type-Options: nosniff" || fallo "Falta X-Content-Type-Options"
 grep -i '^set-cookie: *COFFEEDESK_SID=' "$TMP/h" | grep -qi 'httponly' && ok "Cookie de sesión HttpOnly" || fallo "La cookie de sesión no es HttpOnly"
+! grep -qi '^x-powered-by:' "$TMP/h" && ok "Sin X-Powered-By (no revela la versión de PHP)" || fallo "Se envía X-Powered-By" "$(grep -i '^x-powered-by:' "$TMP/h" | tr -d '\r')"
+! grep -qi '^strict-transport-security:' "$TMP/h" && ok "Sin HSTS mientras forzar_https es false" || fallo "HSTS enviado sin forzar_https"
 grep -q 'pattern="\[A-Za-z0-9._\\-\]{3,30}"' "$TMP/b" && ok "El input usuario lleva pattern con el guion escapado (F-015)" || fallo "pattern del usuario ausente o distinto"
 
 # ------------------------------------------------------------------------
@@ -231,15 +233,37 @@ fi
 # ------------------------------------------------------------------------
 if [ "${CON_APACHE:-0}" = 1 ]; then
     seccion "Bloqueos del .htaccess (F-008) — solo con Apache"
+    # La prueba del límite por IP deja la IP bloqueada; esta sección vuelve a entrar como admin
+    limpiar_intentos
     J="$(nuevo_jar)"
     for ruta in README.md .git/HEAD .htaccess .gitignore \
                 config/credenciales.php config/credenciales.example.php config/constantes.php \
                 sql/01_usuarios_roles.sql logs/php_error.log docs/plan_pruebas.md \
-                php/partials/cabecera.php php/comun/html.php php/auth/csrf.php php/auth/sesion.php \
+                php/partials/cabecera.php php/comun/html.php \
                 herramientas/crear_admin.php tests/integracion.sh; do
         codigo="$(pedir "$J" GET "$ruta")"
         [ "$codigo" = 403 ] && ok "403 en /$ruta" || fallo "/$ruta accesible" "HTTP $codigo"
     done
+    # php/auth/: librerías bloqueadas (también un archivo futuro que no existe: bloqueo por defecto)
+    for ruta in php/auth/sesion.php php/auth/csrf.php php/auth/autorizacion.php \
+                php/auth/arranque_sesion.php php/auth/limite_intentos.php php/auth/archivo_nuevo.php; do
+        codigo="$(pedir "$J" GET "$ruta")"
+        [ "$codigo" = 403 ] && ok "403 en /$ruta (librería)" || fallo "/$ruta accesible" "HTTP $codigo"
+    done
+    # …y los tres endpoints de php/auth/ siguen respondiendo (no 403)
+    J="$(nuevo_jar)"
+    codigo="$(pedir "$J" GET php/auth/login.php)"; loc="$(ubicacion)"
+    [ "$codigo" = 302 ] && [ "${loc%/index.php}" != "$loc" ] && ok "php/auth/login.php accesible (GET → 302 al login)" || fallo "php/auth/login.php" "HTTP $codigo → $loc"
+    codigo="$(pedir "$J" GET php/auth/logout.php)"; loc="$(ubicacion)"
+    [ "$codigo" = 302 ] && [ "${loc%/panel.php}" != "$loc" ] && ok "php/auth/logout.php accesible (GET → 302 al panel)" || fallo "php/auth/logout.php" "HTTP $codigo → $loc"
+    codigo="$(pedir "$J" GET php/auth/estado.php -H 'Accept: application/json')"
+    [ "$codigo" = 401 ] && cuerpo_tiene '"estado":"error"' && ok "php/auth/estado.php accesible (sin sesión → 401 JSON)" || fallo "php/auth/estado.php" "HTTP $codigo"
+    JL="$(nuevo_jar)"
+    codigo="$(login "$JL" admin 'Admin123*')"; loc="$(ubicacion)"
+    codigo2="$(pedir "$JL" GET php/auth/estado.php -H 'Accept: application/json')"
+    [ "$codigo" = 302 ] && [ "${loc%/panel.php}" != "$loc" ] && [ "$codigo2" = 200 ] \
+        && ok "login.php y estado.php funcionan juntos bajo Apache (login → 200 en estado)" \
+        || fallo "login + estado bajo Apache" "login HTTP $codigo → $loc · estado HTTP $codigo2"
     for ruta in css/estilos.css js/login.js; do
         codigo="$(pedir "$J" GET "$ruta")"
         [ "$codigo" = 200 ] && ok "200 en /$ruta (recurso público)" || fallo "/$ruta no se sirve" "HTTP $codigo"

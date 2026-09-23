@@ -36,11 +36,18 @@ function enviar_cabeceras_seguridad(): void
          . "base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
     $nombreCsp = CSP_MODO === 'report' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
 
+    header_remove('X-Powered-By'); // no revelar la versión de PHP
     header($nombreCsp . ': ' . $csp);
     header('X-Frame-Options: DENY');
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: same-origin');
+
+    // HSTS: el navegador recuerda "solo HTTPS" durante max-age segundos y no
+    // hay forma de deshacerlo desde el servidor antes de que venza. Se empieza
+    // con 300 (5 min) para poder volver atrás si el SSL del hosting falla.
+    // Subirlo a 31536000 (1 año) cuando el sitio lleve unos días funcionando
+    // por HTTPS con forzar_https = true sin bucles ni avisos de certificado.
     if (FORZAR_HTTPS && es_https()) {
-        header('Strict-Transport-Security: max-age=31536000');
+        header('Strict-Transport-Security: max-age=300');
     }
 }
