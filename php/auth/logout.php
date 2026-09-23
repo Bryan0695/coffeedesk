@@ -8,7 +8,7 @@
 
 require_once __DIR__ . '/sesion.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valido($_POST['csrf'] ?? null)) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valido(post_texto('csrf'))) {
     redirigir('panel.php');
 }
 

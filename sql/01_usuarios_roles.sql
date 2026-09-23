@@ -1,16 +1,35 @@
 -- =========================================================
--- CoffeeDesk — tablas de autenticación (roles y usuarios)
--- Responsable: Bryan Gallegos · Integrar en el script general de Gabo
+-- CoffeeDesk — versión 1 del esquema: control de versiones, roles y usuarios
+-- Responsable: Bryan Gallegos
 --
 -- Local:   selecciona la base "coffeedesk" en phpMyAdmin e importa.
 -- Hosting: selecciona la base if0_..._coffeedesk en phpMyAdmin e importa.
 -- (Este archivo no usa CREATE DATABASE ni USE, así sirve en ambos.)
--- Probado en MySQL 8.0 (modo estricto). INSERT IGNORE permite re-importarlo sin duplicar.
+-- Compatible con MySQL 8 y MariaDB (XAMPP).
+--
+-- REGLAS DE LOS SCRIPTS SQL (F-016)
+--   * Nunca editar un script que ya se importó en alguna base: los cambios
+--     van en un script NUEVO (03_, 04_, …) que use ALTER TABLE.
+--   * Cada script registra su número en esquema_version justo al inicio.
+--     Si se importa dos veces, falla en esa línea ("Duplicate entry") ANTES
+--     de tocar nada más, y así se nota que ya estaba aplicado.
+--   * Para ver qué tiene una base:  SELECT * FROM esquema_version;
+--   * Los usuarios de prueba NO están aquí: van en 90_seed_solo_local.sql.
 -- =========================================================
 
 SET NAMES utf8mb4;
 
-CREATE TABLE IF NOT EXISTS roles (
+CREATE TABLE IF NOT EXISTS esquema_version (
+    version     SMALLINT UNSIGNED NOT NULL,
+    descripcion VARCHAR(150)      NOT NULL,
+    aplicado_en DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO esquema_version (version, descripcion)
+VALUES (1, 'Control de versiones, roles y usuarios');
+
+CREATE TABLE roles (
     id          TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
     nombre      VARCHAR(20)  NOT NULL,
     descripcion VARCHAR(100) NULL,
@@ -18,7 +37,7 @@ CREATE TABLE IF NOT EXISTS roles (
     UNIQUE KEY uq_roles_nombre (nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS usuarios (
+CREATE TABLE usuarios (
     id            INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     nombre        VARCHAR(80)      NOT NULL,
     usuario       VARCHAR(30)      NOT NULL,
@@ -34,17 +53,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
         ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---- Datos iniciales ----------------------------------------------------
-INSERT IGNORE INTO roles (id, nombre, descripcion) VALUES
+-- ---- Datos base (necesarios también en el hosting) ----------------------
+INSERT INTO roles (id, nombre, descripcion) VALUES
     (1, 'administrador', 'Acceso total: menú, inventario, pedidos'),
     (2, 'mesero',        'Registra pedidos y consulta el menú');
 
--- Usuarios de prueba (CAMBIAR contraseñas antes de la defensa si se desea)
---   admin  / Admin123*
---   mesero / Mesero123*
--- Hashes generados con: php herramientas/generar_hash.php "Admin123*"
-INSERT IGNORE INTO usuarios (nombre, usuario, clave_hash, rol_id) VALUES
-    ('Administrador General', 'admin',
-     '$2y$12$DKjU805WxhgDnmIVt7Fb7.TKI3NewpJ4DfA5sEifHZfOBdOdqSUu.', 1),
-    ('Mesero de Turno', 'mesero',
-     '$2y$12$YPhKy1mm4YekSlCEAlXj.ed2QibyDM.vxX9GwMNZgUfhXnscm8hs6', 2);
+-- El primer administrador del hosting se crea con herramientas/crear_admin.php
