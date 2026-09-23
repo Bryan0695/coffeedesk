@@ -1,17 +1,52 @@
-# Credenciales reales (nunca al repositorio)
+# ==============================
+# CoffeeDesk - Git Ignore
+# ==============================
+
+# Documentación interna / auditorías
+docs/audits/
+docs/evidencias/
+
+# Logs
+logs/*
+!logs/.gitkeep
+!logs/.htaccess
+
+# Credenciales reales
 config/credenciales.php
 
-# Logs de PHP (la carpeta sí se versiona, con su .htaccess)
-logs/*
-!logs/.htaccess
-!logs/.gitkeep
+# Archivos de entorno
+.env
+.env.*
+!.env.example
 
-# Sistema / editores
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Sistema operativo
 .DS_Store
 Thumbs.db
-.vscode/
+desktop.ini
+
+# IDE / editores
+.vscode/*
+!.vscode/settings.json
 .idea/
 
-# Evidencias pesadas y paquetes de despliegue (se entregan aparte)
-*.mp4
-*.zip
+# PHP
+*.cache
+
+# Cobertura / testing generado
+coverage/
+
+# Node, por si posteriormente se agrega frontend con npm
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Documentación local opcional
+.docs/
