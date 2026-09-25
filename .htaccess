@@ -1,6 +1,16 @@
 # Bloquea el acceso directo por navegador a carpetas y archivos internos (F-008)
 Options -Indexes
 
+# Página 404 propia. Se usa mod_rewrite (ruta relativa a esta carpeta) en vez de
+# ErrorDocument, que exige una ruta absoluta distinta en XAMPP (/coffeedesk) y
+# en el hosting (/). 404.php responde con el código 404 real.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ 404.php [L]
+</IfModule>
+
 # Carpetas que solo se incluyen desde PHP o no deben publicarse
 RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials)/
 # php/auth/: todo es librería salvo los tres endpoints (login, logout, estado).

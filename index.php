@@ -21,14 +21,23 @@ require __DIR__ . '/php/partials/head.php';
 <body class="pagina-login">
     <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
 
-    <header class="cabecera-login">
-        <p class="logo" aria-hidden="true">☕</p>
-        <h1>CoffeeDesk</h1>
-        <p class="subtitulo">Gestión de pedidos e inventario</p>
-    </header>
+    <div class="login-contenedor">
+        <header class="login-marca">
+            <p class="marca"><span class="marca-logo"><?= icono('taza') ?></span> CoffeeDesk</p>
+            <div class="login-lema">
+                <h1>Tu cafetería, en orden.</h1>
+                <p>Pedidos por mesa, menú del día e inventario de la cocina en un solo lugar.</p>
+            </div>
+            <ul class="login-puntos">
+                <li><?= icono('pedidos') ?> Pedidos con total automático</li>
+                <li><?= icono('menu') ?> Menú con disponibilidad al día</li>
+                <li><?= icono('inventario') ?> Alertas de stock bajo</li>
+            </ul>
+        </header>
 
     <main id="contenido" class="tarjeta-login">
         <h2>Iniciar sesión</h2>
+        <p class="texto-suave">Ingresa con tu usuario del personal.</p>
 
         <?= mostrar_flash() ?>
 
@@ -58,9 +67,10 @@ require __DIR__ . '/php/partials/head.php';
                 <p class="error-campo" id="error-clave" aria-live="polite"></p>
             </div>
 
-            <button type="submit" class="boton-primario">Ingresar</button>
+            <button type="submit" class="boton-primario boton-bloque">Ingresar</button>
         </form>
     </main>
+    </div>
 
 <?php require __DIR__ . '/php/partials/pie_pagina.php'; ?>
 
