@@ -8,24 +8,93 @@
  * total con los precios de la BD: el total del navegador es solo informativo.
  */
 require_once __DIR__ . '/php/auth/sesion.php';
+require_once __DIR__ . '/php/conexion.php';
+
 requiere_rol(ROL_ADMIN, ROL_MESERO);
 
 $mesas = 10;          // PROVISIONAL (Gabo): o una tabla `mesas`
 $maxCantidad = 20;
 
-// PROVISIONAL (Gabo): consultar('SELECT id, nombre, precio FROM productos WHERE disponible = 1 ORDER BY nombre'). Precio en centavos.
-$productos = [
-    ['id' => 1, 'nombre' => 'Café americano',     'precio' => 150],
-    ['id' => 2, 'nombre' => 'Capuchino',          'precio' => 250],
-    ['id' => 5, 'nombre' => 'Cheesecake de mora', 'precio' => 325],
-    ['id' => 4, 'nombre' => 'Limonada',           'precio' => 200],
-    ['id' => 6, 'nombre' => 'Sánduche de jamón',  'precio' => 300],
-];
-// PROVISIONAL (Gabo): pedidos del día
-$pedidos = [
-    ['id' => 12, 'mesa' => 3, 'cliente' => 'Ana', 'total' => 700, 'estado' => 'Pendiente', 'hora' => '09:15'],
-    ['id' => 11, 'mesa' => 1, 'cliente' => '',    'total' => 400, 'estado' => 'Entregado', 'hora' => '08:50'],
-];
+// Productos disponibles para registrar pedidos
+
+// Solo mostramos productos:
+// - disponibles para la venta
+// - pertenecientes a categorías activas
+
+$productosDb = consultar(
+    'SELECT
+        p.id,
+        p.nombre,
+        p.precio,
+        p.categoria_id,
+        c.nombre AS categoria
+     FROM productos AS p
+     INNER JOIN categorias AS c
+        ON c.id = p.categoria_id
+     WHERE p.disponible = 1
+       AND c.activo = 1
+     ORDER BY c.nombre ASC, p.nombre ASC'
+);
+
+$productos = array_map(
+    static function (array $producto): array {
+        return [
+            'id' => (int) $producto['id'],
+            'nombre' => $producto['nombre'],
+            'categoria_id' => (int) $producto['categoria_id'],
+            'categoria' => $producto['categoria'],
+            'precio' => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
+        ];
+    },
+    $productosDb
+);
+
+// -----------------------------------------------------------------------------
+// Pedidos registrados hoy
+// -----------------------------------------------------------------------------
+// CURDATE() utiliza la zona horaria configurada por php/conexion.php.
+// -----------------------------------------------------------------------------
+
+$pedidosDb = consultar(
+    'SELECT
+        p.id,
+        p.mesa,
+        p.cliente,
+        p.total,
+        p.estado,
+        p.creado_en
+     FROM pedidos AS p
+     WHERE p.creado_en >= CURDATE()
+       AND p.creado_en < CURDATE() + INTERVAL 1 DAY
+     ORDER BY p.creado_en DESC, p.id DESC'
+);
+
+// Adaptamos los tipos y nombres al formato que ya utiliza la vista.
+$pedidos = array_map(
+    static function (array $pedido): array {
+
+        $fecha = new DateTime($pedido['creado_en']);
+
+        return [
+            'id' => (int) $pedido['id'],
+            'mesa' => (int) $pedido['mesa'],
+            'cliente' => $pedido['cliente'] ?? '',
+
+            // DECIMAL de MySQL -> centavos para dinero()
+            'total' => (int) round(
+                ((float) $pedido['total']) * 100
+            ),
+
+            // Guardamos internamente el estado normalizado.
+            'estado' => $pedido['estado'],
+
+            // Solo necesitamos hora y minuto en esta vista.
+            'hora' => $fecha->format('H:i'),
+        ];
+    },
+    $pedidosDb
+);
+
 
 $tituloPagina = 'Pedidos';
 $scripts = ['js/comun.js', 'js/pedidos.js'];
@@ -38,6 +107,13 @@ require __DIR__ . '/php/partials/cabecera.php';
             </div>
         </div>
 
+        <?php if ($productos === []): ?>
+            <div class="alerta alerta-aviso" role="status">
+                <strong>Aviso:</strong>
+                No hay productos disponibles para registrar pedidos.
+            </div>
+        <?php endif; ?>
+
         <form id="form-pedido" class="disposicion" action="<?= e(url('php/pedidos/registrar.php')) ?>"
               method="post" novalidate data-validar aria-labelledby="titulo-nuevo-pedido">
             <?= csrf_campo() ?>
@@ -48,7 +124,13 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <legend>Productos del pedido</legend>
                     <ul id="lista-lineas" class="lista-lineas"></ul>
                     <p class="error-campo" id="error-lineas" aria-live="polite"></p>
-                    <button type="button" class="boton-secundario" id="agregar-linea"><?= icono('mas') ?> Agregar producto</button>
+
+                    <!-- cambios correspondientes a la logica de datos -->
+                    <!-- Responsable: Gabo -->
+                    <button type="button" class="boton-secundario" id="agregar-linea" <?= $productos === [] ? 'disabled' : '' ?>>
+                        <?= icono('mas') ?> Agregar producto
+                    </button>
+
                 </fieldset>
             </section>
 
@@ -74,7 +156,12 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <output id="total-pedido" for="lista-lineas" aria-live="polite">$0.00</output>
                 </p>
 
-                <button type="submit" class="boton-primario boton-bloque">Registrar pedido</button>
+                <!-- cambios correspondientes a la logica de datos -->
+                <!-- Responsable: Gabo -->
+                <button type="submit" class="boton-primario boton-bloque" <?= $productos === [] ? 'disabled' : '' ?>>
+                    Registrar pedido
+                </button>
+
             </section>
         </form>
 
@@ -84,11 +171,15 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <label data-para="producto">Producto</label>
                     <select name="producto_id[]" data-campo="producto" required>
                         <option value="">Elige un producto</option>
+
+                        <!-- cambios correspondientes a la logica de datos -->
+                        <!-- Responsable: Gabo -->
                         <?php foreach ($productos as $p): ?>
                             <option value="<?= (int) $p['id'] ?>" data-precio="<?= (int) $p['precio'] ?>">
-                                <?= e($p['nombre']) ?> — <?= dinero($p['precio']) ?>
+                                <?= e($p['nombre']) ?> — <?= e($p['categoria']) ?> - <?= dinero($p['precio']) ?>
                             </option>
                         <?php endforeach; ?>
+
                     </select>
                     <p class="error-campo" data-error="producto" aria-live="polite"></p>
                 </div>
@@ -108,9 +199,12 @@ require __DIR__ . '/php/partials/cabecera.php';
                 <h2 id="titulo-pedidos-dia">Pedidos de hoy</h2>
                 <p class="resultado-filtro"><?= count($pedidos) ?> registrados</p>
             </div>
+
             <?php if ($pedidos === []): ?>
                 <p class="estado-vacio">Todavía no hay pedidos registrados hoy.</p>
             <?php else: ?>
+                <!-- cambios correspondientes a la logica de datos -->
+                <!-- Responsable: Gabo -->
                 <div class="tabla-envoltura" role="region" aria-labelledby="titulo-pedidos-dia" tabindex="0">
                     <table>
                         <thead>
@@ -121,6 +215,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                                 <th scope="col">Cliente</th>
                                 <th scope="col" class="numero">Total</th>
                                 <th scope="col">Estado</th>
+                                <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -132,8 +227,71 @@ require __DIR__ . '/php/partials/cabecera.php';
                                     <td><?= $p['cliente'] !== '' ? e($p['cliente']) : '<span class="texto-suave">—</span>' ?></td>
                                     <td class="numero"><?= dinero($p['total']) ?></td>
                                     <td>
-                                        <span class="insignia <?= $p['estado'] === 'Entregado' ? 'insignia-ok' : 'insignia-info' ?>"><?= e($p['estado']) ?></span>
+                                      
+                                        <?php
+                                            $claseEstado = match ($p['estado']) {
+                                                'entregado' => 'insignia-ok',
+                                                'anulado'   => 'insignia-error',
+                                                default     => 'insignia-info',
+                                            };
+
+                                            $textoEstado = match ($p['estado']) {
+                                                'entregado' => 'Entregado',
+                                                'anulado'   => 'Anulado',
+                                                default     => 'Pendiente',
+                                            };
+                                        ?>
+
+                                        <span class="insignia <?= e($claseEstado) ?>">
+                                            <?= e($textoEstado) ?>
+                                        </span>
+
                                     </td>
+
+                                    <td>
+                                        <?php if ($p['estado'] === 'pendiente'): ?>
+
+                                            <div class="acciones-tabla">
+
+                                                <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post">
+                                                    <?= csrf_campo() ?>
+
+                                                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                                                    <input type="hidden" name="estado" value="entregado">
+
+                                                    <button type="submit" class="boton-fantasma" title="Entregar Pedido" aria-label="Marcar pedido #<?= (int) $p['id'] ?> como entregado"
+                                                        data-confirmar="¿Marcar el pedido #<?= (int) $p['id'] ?> como entregado?">
+                                                        <?= icono('ok') ?>
+                                                    </button>
+
+                                                </form>
+
+                                                <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post"
+                                                    data-confirmar="¿Anular el pedido #<?= (int) $p['id'] ?>?">
+
+                                                    <?= csrf_campo() ?>
+
+                                                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                                                    <input type="hidden" name="estado" value="anulado">
+
+                                                    <button type="submit" class="boton-fantasma boton-fantasma-peligro" title="Anular Pedido"
+                                                        aria-label="Anular pedido #<?= (int) $p['id'] ?>">
+                                                        <?= icono('alerta') ?>
+                                                    </button>
+                                                </form>
+
+                                            </div>
+
+                                        <?php else: ?>
+
+                                            <span class="texto-secundario">
+                                                
+                                            </span>
+
+                                        <?php endif; ?>
+                                    </td>
+
+
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
