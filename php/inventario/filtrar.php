@@ -1,6 +1,5 @@
 <?php
 
-require_once '../dao/InventarioDAO.php';
 require_once '../shared/Response.php';
 
 header('Content-Type: application/json');
