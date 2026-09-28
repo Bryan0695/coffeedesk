@@ -22,6 +22,7 @@ $carpetasExcluidas = ['.git', '.github', 'config', 'herramientas', 'tests', 'log
 // Archivos sin requiere_*() a propósito: ruta => motivo
 $excepciones = [
     'index.php'                      => 'página de login (pública)',
+    '404.php'                        => 'página "no encontrada" (pública)',
     'php/auth/login.php'             => 'procesa el login (público por definición)',
     'php/auth/logout.php'            => 'cierra la sesión; protegido con POST + CSRF',
     'php/auth/sesion.php'            => 'librería: fachada de seguridad',
