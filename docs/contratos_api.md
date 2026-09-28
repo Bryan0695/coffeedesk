@@ -1,283 +1,311 @@
 # CoffeeDesk
-
-## Contratos Frontend - Backend
+## Contratos Frontend ↔ Backend
 
 Responsable:
 Jeremy Arevalo
 
-## Convención General
- 
-Todas las respuestas deberán devolverse en formato JSON.
- 
-### Respuesta Exitosa
- 
+---
+
+# Formato general de respuesta
+
+## Éxito
+
 ```json
 {
-"estado": "ok",
-"mensaje": "Operación realizada correctamente",
-"datos": {}
-}
-```
- 
-### Respuesta de Error
- 
-```json
-{
-"estado": "error",
-"mensaje": "Descripción del error"
+    "estado":"exito",
+    "mensaje":"Operación realizada correctamente",
+    "datos": {}
 }
 ```
 
-## Módulo Autenticación
+## Error
 
-### Inicio de sesión
+```json
+{
+    "estado":"error",
+    "mensaje":"Descripción del error",
+    "datos": null
+}
+```
+
+---
+
+# INVENTARIO
+
+## Listar insumos
 
 Archivo:
 
-```text
-php/auth/login.php
-```
+php/inventario/listar.php
 
 Método:
 
-```text
-POST
-```
+GET
 
-Parámetros:
+Permisos:
 
-| Campo | Tipo | Requerido |
-|---------|---------|---------|
-| usuario | string | Sí |
-| clave | string | Sí |
+Administrador
 
 Respuesta:
 
 ```json
 {
-  "estado":"ok",
-  "mensaje":"Inicio de sesión correcto",
+  "estado":"exito",
+  "mensaje":"Inventario obtenido",
+  "datos":[]
+}
+```
+
+---
+
+## Crear insumo
+
+Archivo:
+
+php/inventario/guardar.php
+
+Método:
+
+POST
+
+Permisos:
+
+Administrador
+
+Recibe:
+
+```json
+{
+  "nombre":"",
+  "unidad":"",
+  "stock":0,
+  "stock_minimo":0
+}
+```
+
+Respuesta:
+
+```json
+{
+  "estado":"exito",
+  "mensaje":"Insumo registrado",
   "datos":{
-      "id":1,
-      "nombre":"Administrador General",
-      "rol":"administrador"
+      "id":1
   }
 }
 ```
 
-## Estándares de desarrollo
+---
 
-### Arquitectura
-
-- Patrón DAO.
-- Modelo por entidad.
-- Consultas preparadas.
-- Validación en servidor.
-- Respuestas JSON estandarizadas.
-
-### Seguridad
-
-- Uso obligatorio de Prepared Statements.
-- No concatenar variables en consultas SQL.
-- Validación de datos recibidos por GET y POST.
-
-## Módulo Inventario
- 
-### Operaciones previstas
- 
-- Crear insumo
-- Listar insumos
-- Consultar insumo por ID
-- Actualizar insumo
-- Eliminar insumo
-- Buscar insumo
-- Consultar alertas de stock bajo
-- Descuento automático de stock
-
-### Crear Insumo
+## Actualizar insumo
 
 Archivo:
-php/inventario/crear.php
+
+php/inventario/guardar.php
 
 Método:
-POST
-
-Parámetros:
-- nombre
-- stock
-- stock_minimo
-
-Respuesta:
-{
-  "estado":"ok",
-  "mensaje":"Insumo registrado"
-}
-
-# Convención de endpoints
-
-GET
-- Consultar información
 
 POST
-- Crear registro
-- Actualizar registro
-- Eliminar registro
 
-## Crear Insumo
+Permisos:
 
-Archivo:
-php/inventario/crear.php
-
-Método:
-POST
+Administrador
 
 Recibe:
 
-- nombre
-- stock
-- stock_minimo
-
-Respuesta exitosa:
-
 ```json
 {
-  "estado":"ok",
-  "mensaje":"Insumo registrado"
+  "id":1,
+  "nombre":"",
+  "unidad":"",
+  "stock":0,
+  "stock_minimo":0
 }
 ```
-
-Respuesta error:
-
-```json
-{
-  "estado":"error",
-  "mensaje":"Datos inválidos"
-}
-```
-
-## Actualizar Insumo
-
-Archivo:
-php/inventario/actualizar.php
-
-Método:
-POST
-
-Recibe:
-- id
-- nombre
-- stock
-- stock_minimo
-
-Validaciones:
-- id obligatorio
-- stock >= 0
-- stock_minimo >= 0
 
 Respuesta:
 
+```json
 {
-  "estado":"ok",
+  "estado":"exito",
   "mensaje":"Insumo actualizado"
 }
+```
 
-## Eliminar Insumo
+---
+
+## Eliminar insumo
 
 Archivo:
+
 php/inventario/eliminar.php
 
 Método:
+
 POST
 
-Recibe:
-- id
+Permisos:
 
-Validaciones:
-- id obligatorio
+Administrador
+
+Recibe:
+
+```json
+{
+  "id":1
+}
+```
 
 Respuesta:
 
+```json
 {
-  "estado":"ok",
+  "estado":"exito",
   "mensaje":"Insumo eliminado"
 }
+```
 
-## Buscar Insumo
+---
 
-Archivo:
-php/inventario/buscar.php
-
-Método:
-GET
-
-Recibe:
-- texto
-
-Respuesta:
-
-{
-  "estado":"ok",
-  "datos":[]
-}
-
-## Alertas de Stock Bajo
+## Alertas de stock
 
 Archivo:
+
 php/inventario/alertas.php
 
 Método:
+
 GET
 
-Recibe:
-ningún parámetro
+Permisos:
+
+Administrador
 
 Respuesta:
 
+```json
 {
-  "estado":"ok",
-  "datos":[
-      {
-          "id":1,
-          "nombre":"Cafe",
-          "stock":5,
-          "stock_minimo":10
-      }
-  ]
+  "estado":"exito",
+  "mensaje":"Alertas obtenidas",
+  "datos":[]
 }
+```
 
-## Descuento de Stock
+---
+
+# BÚSQUEDA DE PRODUCTOS
+
+## Buscar productos
 
 Archivo:
-php/inventario/descontar_stock.php
+
+php/inventario/buscar.php
 
 Método:
-POST
 
-Recibe:
-- producto_id
-- cantidad
+GET
+
+Permisos:
+
+Administrador
+
+Parámetros:
+
+```text
+?q=cafe
+```
 
 Respuesta:
 
+```json
 {
-  "estado":"ok",
-  "mensaje":"Stock actualizado"
+  "estado":"exito",
+  "mensaje":"Búsqueda realizada",
+  "datos":[]
 }
+```
 
-## Filtrar Productos por Categoría
+---
+
+## Filtrar por categoría
 
 Archivo:
+
 php/inventario/filtrar.php
 
 Método:
+
 GET
 
-Recibe:
-- categoria_id
+Permisos:
+
+Administrador
+
+Parámetros:
+
+```text
+?categoria_id=2
+```
 
 Respuesta:
 
+```json
 {
-  "estado":"ok",
+  "estado":"exito",
+  "mensaje":"Productos filtrados",
   "datos":[]
 }
+```
+
+---
+
+# DESCUENTO DE STOCK
+
+## Descontar stock
+
+Archivo:
+
+php/inventario/descontar_stock.php
+
+Método:
+
+POST
+
+Permisos:
+
+Administrador
+
+Uso:
+
+Consumido internamente por el módulo de pedidos.
+
+Recibe:
+
+```json
+{
+  "producto_id":1,
+  "cantidad":2
+}
+```
+
+Respuesta:
+
+```json
+{
+  "estado":"exito",
+  "mensaje":"Stock actualizado correctamente"
+}
+```
+
+---
+
+# Reglas de seguridad
+
+Todos los endpoints implementan:
+
+- requiere_rol_api(ROL_ADMIN)
+- consultas preparadas
+- validación servidor
+- protección CSRF
+- prevención SQL Injection
+- respuestas JSON estandarizadas
