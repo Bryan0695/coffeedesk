@@ -235,6 +235,7 @@ $productosDb = consultar(
         ON c.id = p.categoria_id
      WHERE p.id IN (' . $marcadores . ')
        AND p.disponible = 1
+       AND p.activo = 1
        AND c.activo = 1',
     $idsProductos
 );

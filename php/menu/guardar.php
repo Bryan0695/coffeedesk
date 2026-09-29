@@ -16,10 +16,7 @@
 require_once __DIR__ . '/../auth/sesion.php';
 require_once __DIR__ . '/../conexion.php';
 
-// -----------------------------------------------------------------------------
 // Seguridad
-// -----------------------------------------------------------------------------
-
 requiere_rol(ROL_ADMIN);
 
 // Este archivo solamente acepta peticiones POST.
@@ -37,28 +34,23 @@ if (!csrf_valido(post_texto('csrf'))) {
     redirigir('menu.php');
 }
 
-// -----------------------------------------------------------------------------
 // Obtener datos
-// -----------------------------------------------------------------------------
 
-$idTexto = trim(post_texto('id'));
-$nombre = trim(post_texto('nombre'));
-$categoriaId = post_entero('categoria_id');
-$precioTexto = trim(post_texto('precio'));
-$disponible = isset($_POST['disponible']) ? 1 : 0; // Un checkbox no marcado no se envía en POST.
+$idTexto        = trim(post_texto('id'));
+$nombre         = trim(post_texto('nombre'));
+$categoriaId    = post_entero('categoria_id');
+$precioTexto    = trim(post_texto('precio'));
+$disponible     = isset($_POST['disponible']) ? 1 : 0; // Un checkbox no marcado no se envía en POST.
 
-$esEdicion = $idTexto !== ''; // Determinamos si estamos creando o editando.
+$esEdicion      = $idTexto !== ''; // Determinamos si estamos creando o editando.
 
-$id = null;
+$id             = null;
 
 if ($esEdicion) {
     $id = post_entero('id');
 }
 
-// -----------------------------------------------------------------------------
-// Validaciones
-// -----------------------------------------------------------------------------
-
+// Validaciones comunes antes de agregarlos a la BD
 $errores = [];
 
 // ----- ID --------------------------------------------------------------------
@@ -82,36 +74,24 @@ if ($categoriaId === null || $categoriaId <= 0) {
 }
 
 // ----- Precio ----------------------------------------------------------------
-
-// Permitimos:
-// 2
-// 2.5
-// 2.50
-//
+// Permitimos: (2 , 2.5 , 2.50)
 // También normalizamos coma por punto por seguridad.
+
 $precioTexto = str_replace(',', '.', $precioTexto);
 
-if (
-    $precioTexto === ''
-    || !preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $precioTexto)
-) {
+if ($precioTexto === '' || !preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $precioTexto)) {
     $errores[] = 'El precio debe ser un número válido entre 0.01 y 999.99.';
 }
 
 // Trabajamos primero en centavos para evitar errores de punto flotante.
 $precioCentavos = null;
 
-if (
-    $precioTexto !== ''
-    && preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $precioTexto)
-) {
+if ($precioTexto !== '' && preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $precioTexto)) {
     [$entero, $decimales] = array_pad(explode('.', $precioTexto, 2),2,'');
 
     $decimales = str_pad($decimales, 2, '0');
 
-    $precioCentavos =
-        ((int) $entero * 100)
-        + (int) substr($decimales, 0, 2);
+    $precioCentavos = ((int) $entero * 100) + (int) substr($decimales, 0, 2);
 
     if ($precioCentavos < 1 || $precioCentavos > 99999) {
         $errores[] = 'El precio debe estar entre 0.01 y 999.99.';
@@ -150,14 +130,24 @@ if ($categoria === null) {
 }
 
 // -----------------------------------------------------------------------------
+// Convertir precio al formato DECIMAL de MySQL
+//
+// 250 -> "2.50"
+// 375 -> "3.75"
+// -----------------------------------------------------------------------------
+$precio = number_format($precioCentavos / 100,2,'.','');
+
+
+// -----------------------------------------------------------------------------
 // Si estamos editando, comprobar que el producto exista.
 // -----------------------------------------------------------------------------
 
 if ($esEdicion) {
     $productoExistente = consultar_uno(
-        'SELECT id, nombre
+        'SELECT id, nombre, activo
          FROM productos
          WHERE id = ?
+         AND activo = 1
          LIMIT 1',
         [$id]
     );
@@ -173,56 +163,93 @@ if ($esEdicion) {
 }
 
 // -----------------------------------------------------------------------------
-// Evitar productos con el mismo nombre
+// Comprobar productos con el mismo nombre
+// Casos:
+// 1. No existe 
+//      continuar normalmente.
+// 2. Existe y activo = 1
+//      error por nombre duplicado.
+// 3. Existe y activo = 0, y estamos creando
+//      reactivar el producto existente.
+// 4. Existe y activo = 0, pero estamos editando otro producto
+//      impedir usar ese nombre.
 // -----------------------------------------------------------------------------
 
-if ($esEdicion) {
-    $productoDuplicado = consultar_uno(
-        'SELECT id
-         FROM productos
-         WHERE nombre = ?
-           AND id <> ?
-         LIMIT 1',
-        [$nombre, $id]
-    );
-} else {
-    $productoDuplicado = consultar_uno(
-        'SELECT id
-         FROM productos
-         WHERE nombre = ?
-         LIMIT 1',
-        [$nombre]
-    );
-}
+$existente = consultar_uno(
+    'SELECT id, nombre, activo
+     FROM productos
+     WHERE nombre = ?
+       AND id <> ?
+     LIMIT 1',
+    [
+        $nombre, 
+        $id ?? 0
+    ]
+);
 
-if ($productoDuplicado !== null) {
+if ($existente !== null) {
+
+    // Ya existe otro producto activo con ese nombre
+    if ((int) $existente['activo'] === 1) {
+
+        mensaje_flash(
+            'error',
+            'Ya existe un producto registrado con ese nombre.'
+        );
+
+        redirigir('menu.php#form-producto');
+    }
+
+    // Existe, pero estaba eliminado lógicamente.
+    // Si estamos CREANDO un producto, reactivamos el registro existente
+    // en lugar de crear otro registro con un nuevo ID.
+
+    if (!$esEdicion) {
+
+        // El precio todavía no ha sido convertido a DECIMAL en esta parte
+        // del archivo, por eso primero hacemos la conversión aquí.
+        // $precioReactivacion = number_format($precioCentavos / 100,2,'.','');
+
+        ejecutar(
+            'UPDATE productos
+             SET
+                nombre = ?,
+                categoria_id = ?,
+                precio = ?,
+                disponible = ?,
+                activo = 1
+             WHERE id = ?',
+            [
+                $nombre,
+                $categoriaId,
+                $precio,
+                $disponible,
+                (int) $existente['id']
+            ]
+        );
+
+        mensaje_flash(
+            'exito',
+            'El producto "' . $nombre . '" volvió al menú. Se activo correctamente.'
+        );
+
+        redirigir('menu.php');
+    }
+
+    // Estamos editando otro producto e intentamos darle el nombre de un
+    // producto eliminado.
+
     mensaje_flash(
         'error',
-        'Ya existe un producto registrado con ese nombre.'
+        'Ese nombre pertenece a un producto eliminado; créalo de nuevo para reactivarlo.'
     );
 
     redirigir('menu.php#form-producto');
-}
+}                              
 
-// -----------------------------------------------------------------------------
-// Convertir los centavos nuevamente al formato DECIMAL que utiliza MySQL.
-//
-// 250 -> "2.50"
-// 375 -> "3.75"
-// -----------------------------------------------------------------------------
-
-$precio = number_format($precioCentavos / 100,2,'.','');
-
-// -----------------------------------------------------------------------------
 // Guardar
-// -----------------------------------------------------------------------------
-
 try {
-
-    // -------------------------------------------------------------------------
     // EDITAR
-    // -------------------------------------------------------------------------
-
     if ($esEdicion) {
 
         ejecutar(
@@ -231,7 +258,8 @@ try {
                  categoria_id = ?,
                  precio = ?,
                  disponible = ?
-             WHERE id = ?',
+             WHERE id = ?
+             AND activo = 1' ,
             [
                 $nombre,
                 $categoriaId,
@@ -248,19 +276,17 @@ try {
 
         redirigir('menu.php');
     }
-
-    // -------------------------------------------------------------------------
+    
     // CREAR
-    // -------------------------------------------------------------------------
-
     insertar(
         'INSERT INTO productos (
             categoria_id,
             nombre,
             precio,
-            disponible
+            disponible,
+            activo
          )
-         VALUES (?, ?, ?, ?)',
+         VALUES (?, ?, ?, ?, 1)',
         [
             $categoriaId,
             $nombre,

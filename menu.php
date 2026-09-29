@@ -1,62 +1,75 @@
 <?php
-/**
- * Menú: búsqueda, filtro por categoría y (solo administrador) alta, edición y baja de productos.
- *
- * Vista: Frederick · Lógica y datos: Gabo.
- * Los nombres de los campos y los archivos de destino son PROVISIONALES
- * hasta que Jeremy entregue los contratos.
- */
-require_once __DIR__ . '/php/auth/sesion.php';
-require_once __DIR__ . '/php/conexion.php';
+    /**
+     * Menú: búsqueda, filtro por categoría y (solo administrador) alta, edición y baja de productos.
+     *
+     * Vista: Frederick · Lógica y datos: Gabo.
+     * Los nombres de los campos y los archivos de destino son PROVISIONALES
+     * hasta que Jeremy entregue los contratos.
+     */
+    require_once __DIR__ . '/php/auth/sesion.php';
+    require_once __DIR__ . '/php/conexion.php';
 
-requiere_rol(ROL_ADMIN, ROL_MESERO);
+    requiere_rol(ROL_ADMIN, ROL_MESERO);
 
-//Consultas predefinidas para traer categorias y productos para el menu
-// Categorías activas para filtros y formulario de productos
-$categorias = consultar(
-    'SELECT id, nombre
-     FROM categorias
-     WHERE activo = 1
-     ORDER BY nombre ASC'
-);
+    //Consultas predefinidas para traer categorias y productos para el menu
+    // Categorías activas para filtros y formulario de productos
+    $categorias = consultar(
+        'SELECT id, nombre
+        FROM categorias
+        WHERE activo = 1
+        ORDER BY nombre ASC'
+    );
 
-// Productos activos junto con su categoría.
-// En MySQL el precio está guardado como DECIMAL(10,2),
-// pero la vista trabaja internamente con centavos.
-$productosDb = consultar(
-    'SELECT
-        p.id,
-        p.nombre,
-        p.categoria_id,
-        c.nombre AS categoria,
-        p.precio,
-        p.disponible
-     FROM productos AS p
-     INNER JOIN categorias AS c
-        ON c.id = p.categoria_id
-     WHERE c.activo = 1
-     ORDER BY c.nombre ASC, p.nombre ASC'
-);
+    $categoriasMantenimiento = [];
 
-// Convertimos los valores recibidos desde MySQL a los tipos
-// que espera actualmente la interfaz.
-$productos = array_map(
-    static function (array $producto): array {
-        return [
-            'id' => (int) $producto['id'],
-            'nombre' => $producto['nombre'],
-            'categoria_id' => (int) $producto['categoria_id'],
-            'categoria' => $producto['categoria'],
-            'precio' => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
-            'disponible' => (bool) $producto['disponible'],
-        ];
-    },
-    $productosDb
-);
+    if (es_admin()) {
 
-$tituloPagina = 'Menú';
-$scripts = ['js/comun.js', 'js/menu.js'];
-require __DIR__ . '/php/partials/cabecera.php';
+        $categoriasMantenimiento = consultar(
+            'SELECT
+                id, nombre, activo
+            FROM categorias
+            ORDER BY activo DESC, nombre ASC'
+        );
+    }
+
+    // Productos activos junto con su categoría.
+    // En MySQL el precio está guardado como DECIMAL(10,2),
+    // pero la vista trabaja internamente con centavos.
+    $productosDb = consultar(
+        'SELECT
+            p.id,
+            p.nombre,
+            p.categoria_id,
+            c.nombre AS categoria,
+            p.precio,
+            p.disponible
+        FROM productos AS p
+        INNER JOIN categorias AS c
+            ON c.id = p.categoria_id
+        WHERE p.activo = 1
+        AND c.activo = 1
+        ORDER BY c.nombre ASC, p.nombre ASC'
+    );
+
+    // Convertimos los valores recibidos desde MySQL a los tipos
+    // que espera actualmente la interfaz.
+    $productos = array_map(
+        static function (array $producto): array {
+            return [
+                'id' => (int) $producto['id'],
+                'nombre' => $producto['nombre'],
+                'categoria_id' => (int) $producto['categoria_id'],
+                'categoria' => $producto['categoria'],
+                'precio' => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
+                'disponible' => (bool) $producto['disponible'],
+            ];
+        },
+        $productosDb
+    );
+
+    $tituloPagina = 'Menú';
+    $scripts = ['js/comun.js', 'js/menu.js'];
+    require __DIR__ . '/php/partials/cabecera.php';
 ?>
         <div class="encabezado-pagina">
             <div>
@@ -68,6 +81,11 @@ require __DIR__ . '/php/partials/cabecera.php';
             <?php if (es_admin()): ?>
                 <a class="boton-primario" href="#form-producto"><?= icono('mas') ?> Nuevo producto</a>
             <?php endif; ?>
+
+            <?php if (es_admin()): ?>
+                <a class="boton-secundario" href="<?= e(url('categorias.php')) ?>">
+                <?= icono('editar') ?> Administrar categorías </a>
+            <?php endif; ?>
         </div>
 
         <div class="<?= es_admin() ? 'disposicion' : '' ?>">
@@ -78,11 +96,15 @@ require __DIR__ . '/php/partials/cabecera.php';
                 </div>
 
                 <form class="filtros" role="search" aria-label="Buscar productos" id="form-filtros">
+                    
                     <div class="campo campo-busqueda">
+
                         <label for="buscar">Buscar por nombre</label>
                         <?= icono('buscar') ?>
                         <input type="search" id="buscar" name="q" autocomplete="off" placeholder="Ej.: capuchino">
+
                     </div>
+
                     <div class="campo">
                         <label for="filtro-categoria">Categoría</label>
                         <select id="filtro-categoria" name="categoria">
@@ -92,6 +114,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+
                 </form>
 
                 <div class="tabla-envoltura" role="region" aria-labelledby="titulo-productos" tabindex="0">

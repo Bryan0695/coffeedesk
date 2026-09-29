@@ -38,8 +38,8 @@ if (!csrf_valido(post_texto('csrf'))) {
 }
 
 // Datos
-$id = post_entero('id');
-$nuevoEstado = trim(post_texto('estado'));
+$id             = post_entero('id');
+$nuevoEstado    = trim(post_texto('estado'));
 
 // Validar ID
 if ($id === null || $id <= 0) {
@@ -69,12 +69,21 @@ if (!in_array($nuevoEstado, $estadosPermitidos, true)) {
     redirigir('pedidos.php');
 }
 
+// Validación del estado anular en pedido. Solo admin puede anualr
+if ($nuevoEstado === 'anulado' && !es_admin()) {
+
+    mensaje_flash(
+        'error',
+        'Solo un administrador puede anular pedidos.'
+    );
+
+    redirigir('pedidos.php');
+}
+
 // Consultar pedido
 
 $pedido = consultar_uno(
-    'SELECT
-        id,
-        estado
+    'SELECT id, estado
      FROM pedidos
      WHERE id = ?
      LIMIT 1',

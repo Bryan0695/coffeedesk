@@ -32,18 +32,19 @@ $productosDb = consultar(
      INNER JOIN categorias AS c
         ON c.id = p.categoria_id
      WHERE p.disponible = 1
-       AND c.activo = 1
+        AND p.activo = 1
+        AND c.activo = 1
      ORDER BY c.nombre ASC, p.nombre ASC'
 );
 
 $productos = array_map(
     static function (array $producto): array {
         return [
-            'id' => (int) $producto['id'],
-            'nombre' => $producto['nombre'],
-            'categoria_id' => (int) $producto['categoria_id'],
-            'categoria' => $producto['categoria'],
-            'precio' => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
+            'id'            => (int) $producto['id'],
+            'nombre'        => $producto['nombre'],
+            'categoria_id'  => (int) $producto['categoria_id'],
+            'categoria'     => $producto['categoria'],
+            'precio'        => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
         ];
     },
     $productosDb
@@ -266,19 +267,22 @@ require __DIR__ . '/php/partials/cabecera.php';
 
                                                 </form>
 
-                                                <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post"
-                                                    data-confirmar="¿Anular el pedido #<?= (int) $p['id'] ?>?">
+                                             <!-- Validación de Admin para anular pedidos -->
+                                                <?php if (es_admin()): ?>
+                                                    <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post"
+                                                        data-confirmar="¿Anular el pedido #<?= (int) $p['id'] ?>?">
 
-                                                    <?= csrf_campo() ?>
+                                                        <?= csrf_campo() ?>
 
-                                                    <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-                                                    <input type="hidden" name="estado" value="anulado">
+                                                        <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                                                        <input type="hidden" name="estado" value="anulado">
 
-                                                    <button type="submit" class="boton-fantasma boton-fantasma-peligro" title="Anular Pedido"
-                                                        aria-label="Anular pedido #<?= (int) $p['id'] ?>">
-                                                        <?= icono('alerta') ?>
-                                                    </button>
-                                                </form>
+                                                        <button type="submit" class="boton-fantasma boton-fantasma-peligro" title="Anular Pedido"
+                                                            aria-label="Anular pedido #<?= (int) $p['id'] ?>">
+                                                            <?= icono('alerta') ?>
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
 
                                             </div>
 

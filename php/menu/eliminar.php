@@ -16,10 +16,7 @@
 require_once __DIR__ . '/../auth/sesion.php';
 require_once __DIR__ . '/../conexion.php';
 
-// -----------------------------------------------------------------------------
 // Seguridad
-// -----------------------------------------------------------------------------
-
 requiere_rol(ROL_ADMIN);
 
 // Solo aceptamos POST.
@@ -42,10 +39,7 @@ if (!csrf_valido(post_texto('csrf'))) {
     redirigir('menu.php');
 }
 
-// -----------------------------------------------------------------------------
 // Obtener y validar ID
-// -----------------------------------------------------------------------------
-
 $id = post_entero('id');
 
 if ($id === null || $id <= 0) {
@@ -57,14 +51,10 @@ if ($id === null || $id <= 0) {
     redirigir('menu.php');
 }
 
-// -----------------------------------------------------------------------------
 // Verificar que el producto exista y siga activo
-// -----------------------------------------------------------------------------
 
 $producto = consultar_uno(
-    'SELECT
-        id,
-        nombre
+    'SELECT id, nombre, activo
      FROM productos
      WHERE id = ?
      LIMIT 1',
@@ -80,22 +70,32 @@ if ($producto === null) {
     redirigir('menu.php');
 }
 
-// -----------------------------------------------------------------------------
+if ((int) $producto['activo'] === 0) {
+
+    mensaje_flash(
+        'aviso',
+        'El producto ya se encuentra eliminado.'
+    );
+
+    redirigir('menu.php');
+}
+
 // Baja lógica
-// -----------------------------------------------------------------------------
 
 try {
 
     ejecutar(
         'UPDATE productos
-         SET disponible = 0
-         WHERE id = ?',
+         SET    activo = 0,
+                disponible = 0
+         WHERE id = ?
+         AND activo = 1',
         [$id]
     );
 
     mensaje_flash(
         'exito',
-        'El producto "' . $producto['nombre'] . '" se eliminó/agotó correctamente.'
+        'El producto "' . $producto['nombre'] . '" se eliminó correctamente.'
     );
 
     redirigir('menu.php');
