@@ -1,34 +1,75 @@
 <?php
-/**
- * Menú: búsqueda, filtro por categoría y (solo administrador) alta, edición y baja de productos.
- *
- * Vista: Frederick · Lógica y datos: Gabo.
- * Los nombres de los campos y los archivos de destino son PROVISIONALES
- * hasta que Jeremy entregue los contratos.
- */
-require_once __DIR__ . '/php/auth/sesion.php';
-requiere_rol(ROL_ADMIN, ROL_MESERO);
+    /**
+     * Menú: búsqueda, filtro por categoría y (solo administrador) alta, edición y baja de productos.
+     *
+     * Vista: Frederick · Lógica y datos: Gabo.
+     * Los nombres de los campos y los archivos de destino son PROVISIONALES
+     * hasta que Jeremy entregue los contratos.
+     */
+    require_once __DIR__ . '/php/auth/sesion.php';
+    require_once __DIR__ . '/php/conexion.php';
 
-// PROVISIONAL (Gabo): reemplazar por consultar('SELECT id, nombre FROM categorias ORDER BY nombre')
-$categorias = [
-    ['id' => 1, 'nombre' => 'Bebidas calientes'],
-    ['id' => 2, 'nombre' => 'Bebidas frías'],
-    ['id' => 3, 'nombre' => 'Repostería'],
-    ['id' => 4, 'nombre' => 'Aperitivos'],
-];
-// PROVISIONAL (Gabo): reemplazar por consultar(...) uniendo productos con categorias. Precio en centavos.
-$productos = [
-    ['id' => 1, 'nombre' => 'Café americano',     'categoria_id' => 1, 'categoria' => 'Bebidas calientes', 'precio' => 150, 'disponible' => true],
-    ['id' => 2, 'nombre' => 'Capuchino',          'categoria_id' => 1, 'categoria' => 'Bebidas calientes', 'precio' => 250, 'disponible' => true],
-    ['id' => 3, 'nombre' => 'Frappé de caramelo', 'categoria_id' => 2, 'categoria' => 'Bebidas frías',     'precio' => 375, 'disponible' => false],
-    ['id' => 4, 'nombre' => 'Limonada',           'categoria_id' => 2, 'categoria' => 'Bebidas frías',     'precio' => 200, 'disponible' => true],
-    ['id' => 5, 'nombre' => 'Cheesecake de mora', 'categoria_id' => 3, 'categoria' => 'Repostería',        'precio' => 325, 'disponible' => true],
-    ['id' => 6, 'nombre' => 'Sánduche de jamón',  'categoria_id' => 4, 'categoria' => 'Aperitivos',        'precio' => 300, 'disponible' => true],
-];
+    requiere_rol(ROL_ADMIN, ROL_MESERO);
 
-$tituloPagina = 'Menú';
-$scripts = ['js/comun.js', 'js/menu.js'];
-require __DIR__ . '/php/partials/cabecera.php';
+    //Consultas predefinidas para traer categorias y productos para el menu
+    // Categorías activas para filtros y formulario de productos
+    $categorias = consultar(
+        'SELECT id, nombre
+        FROM categorias
+        WHERE activo = 1
+        ORDER BY nombre ASC'
+    );
+
+    $categoriasMantenimiento = [];
+
+    if (es_admin()) {
+
+        $categoriasMantenimiento = consultar(
+            'SELECT
+                id, nombre, activo
+            FROM categorias
+            ORDER BY activo DESC, nombre ASC'
+        );
+    }
+
+    // Productos activos junto con su categoría.
+    // En MySQL el precio está guardado como DECIMAL(10,2),
+    // pero la vista trabaja internamente con centavos.
+    $productosDb = consultar(
+        'SELECT
+            p.id,
+            p.nombre,
+            p.categoria_id,
+            c.nombre AS categoria,
+            p.precio,
+            p.disponible
+        FROM productos AS p
+        INNER JOIN categorias AS c
+            ON c.id = p.categoria_id
+        WHERE p.activo = 1
+        AND c.activo = 1
+        ORDER BY c.nombre ASC, p.nombre ASC'
+    );
+
+    // Convertimos los valores recibidos desde MySQL a los tipos
+    // que espera actualmente la interfaz.
+    $productos = array_map(
+        static function (array $producto): array {
+            return [
+                'id' => (int) $producto['id'],
+                'nombre' => $producto['nombre'],
+                'categoria_id' => (int) $producto['categoria_id'],
+                'categoria' => $producto['categoria'],
+                'precio' => (int) round(((float) $producto['precio']) * 100), // 2.50 en MySQL -> 250 centavos en PHP
+                'disponible' => (bool) $producto['disponible'],
+            ];
+        },
+        $productosDb
+    );
+
+    $tituloPagina = 'Menú';
+    $scripts = ['js/comun.js', 'js/menu.js'];
+    require __DIR__ . '/php/partials/cabecera.php';
 ?>
         <div class="encabezado-pagina">
             <div>
@@ -40,6 +81,11 @@ require __DIR__ . '/php/partials/cabecera.php';
             <?php if (es_admin()): ?>
                 <a class="boton-primario" href="#form-producto"><?= icono('mas') ?> Nuevo producto</a>
             <?php endif; ?>
+
+            <?php if (es_admin()): ?>
+                <a class="boton-secundario" href="<?= e(url('categorias.php')) ?>">
+                <?= icono('editar') ?> Administrar categorías </a>
+            <?php endif; ?>
         </div>
 
         <div class="<?= es_admin() ? 'disposicion' : '' ?>">
@@ -50,11 +96,15 @@ require __DIR__ . '/php/partials/cabecera.php';
                 </div>
 
                 <form class="filtros" role="search" aria-label="Buscar productos" id="form-filtros">
+                    
                     <div class="campo campo-busqueda">
+
                         <label for="buscar">Buscar por nombre</label>
                         <?= icono('buscar') ?>
                         <input type="search" id="buscar" name="q" autocomplete="off" placeholder="Ej.: capuchino">
+
                     </div>
+
                     <div class="campo">
                         <label for="filtro-categoria">Categoría</label>
                         <select id="filtro-categoria" name="categoria">
@@ -64,6 +114,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+
                 </form>
 
                 <div class="tabla-envoltura" role="region" aria-labelledby="titulo-productos" tabindex="0">
@@ -93,20 +144,31 @@ require __DIR__ . '/php/partials/cabecera.php';
                                     <?php if (es_admin()): ?>
                                         <td>
                                             <div class="acciones-tabla">
+
                                                 <button type="button" class="boton-fantasma" data-editar title="Editar"
                                                         data-id="<?= (int) $p['id'] ?>"
                                                         data-nombre="<?= e($p['nombre']) ?>"
                                                         data-categoria="<?= (int) $p['categoria_id'] ?>"
                                                         data-precio="<?= e(number_format($p['precio'] / 100, 2, '.', '')) ?>"
                                                         data-disponible="<?= $p['disponible'] ? '1' : '0' ?>"
-                                                        aria-label="Editar <?= e($p['nombre']) ?>"><?= icono('editar') ?></button>
+                                                        aria-label="Editar <?= e($p['nombre']) ?>">
+
+                                                        <?= icono('editar') ?>
+
+                                                </button>
+
                                                 <form action="<?= e(url('php/menu/eliminar.php')) ?>" method="post"
                                                       data-confirmar="¿Eliminar «<?= e($p['nombre']) ?>» del menú?">
                                                     <?= csrf_campo() ?>
                                                     <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                                                     <button type="submit" class="boton-fantasma boton-fantasma-peligro" title="Eliminar"
-                                                            aria-label="Eliminar <?= e($p['nombre']) ?>"><?= icono('eliminar') ?></button>
+                                                            aria-label="Eliminar <?= e($p['nombre']) ?>">
+
+                                                            <?= icono('eliminar') ?>
+                                                            
+                                                    </button>
                                                 </form>
+
                                             </div>
                                         </td>
                                     <?php endif; ?>
@@ -131,6 +193,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                                    aria-describedby="error-producto-nombre">
                             <p class="error-campo" id="error-producto-nombre" aria-live="polite"></p>
                         </div>
+
                         <div class="campo">
                             <label for="producto-categoria">Categoría</label>
                             <select id="producto-categoria" name="categoria_id" required
@@ -142,6 +205,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                             </select>
                             <p class="error-campo" id="error-producto-categoria" aria-live="polite"></p>
                         </div>
+
                         <div class="campo">
                             <label for="producto-precio">Precio (USD)</label>
                             <input type="number" id="producto-precio" name="precio" required
@@ -159,6 +223,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                             <button type="submit" class="boton-primario" id="boton-guardar">Guardar producto</button>
                             <button type="button" class="boton-secundario" id="cancelar-edicion" hidden>Cancelar</button>
                         </div>
+
                     </form>
                 </section>
             <?php endif; ?>
