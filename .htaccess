@@ -12,7 +12,7 @@ Options -Indexes
 </IfModule>
 
 # Carpetas que solo se incluyen desde PHP o no deben publicarse
-RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials)/
+RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials|php/dao|php/models)/
 # php/auth/: todo es librería salvo los tres endpoints (login, logout, estado).
 # Un archivo nuevo en php/auth/ queda bloqueado hasta que se agregue aquí.
 RedirectMatch 403 ^/?(.*/)?php/auth/(?!(login|logout|estado)\.php$)[^/]*\.php$
