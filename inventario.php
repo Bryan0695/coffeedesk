@@ -7,19 +7,14 @@
  * hasta que Jeremy entregue los contratos.
  */
 require_once __DIR__ . '/php/auth/sesion.php';
+require_once __DIR__ . '/php/dao/InventarioDAO.php';
 requiere_rol(ROL_ADMIN);
 
 $unidades = ['unidades', 'kg', 'g', 'litros', 'ml'];
 
-// PROVISIONAL (Jeremy): consultar('SELECT id, nombre, unidad, stock, stock_minimo FROM insumos ORDER BY nombre')
-$insumos = [
-    ['id' => 1, 'nombre' => 'Café en grano',  'unidad' => 'kg',       'stock' => 8,  'stock_minimo' => 3],
-    ['id' => 2, 'nombre' => 'Leche entera',   'unidad' => 'litros',   'stock' => 4,  'stock_minimo' => 10],
-    ['id' => 3, 'nombre' => 'Azúcar',         'unidad' => 'kg',       'stock' => 12, 'stock_minimo' => 2],
-    ['id' => 4, 'nombre' => 'Vasos de 12 oz', 'unidad' => 'unidades', 'stock' => 40, 'stock_minimo' => 50],
-    ['id' => 5, 'nombre' => 'Limones',        'unidad' => 'unidades', 'stock' => 60, 'stock_minimo' => 20],
-];
+$dao = new InventarioDAO();
 
+$insumos = $dao->listar();
 $stockBajo = array_filter($insumos, fn ($i) => $i['stock'] <= $i['stock_minimo']);
 
 $tituloPagina = 'Inventario';
