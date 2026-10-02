@@ -2,24 +2,17 @@
 /**
  * Inventario: insumos con alerta de stock bajo, búsqueda y alta, edición y baja (solo administrador).
  *
- * Vista: Frederick · Lógica y datos: Jeremy.
- * Los nombres de los campos y los archivos de destino son PROVISIONALES
- * hasta que Jeremy entregue los contratos.
+ * Vista: Frederick · Lógica y datos: Jeremy (php/inventario/, php/dao/InventarioDAO.php).
  */
 require_once __DIR__ . '/php/auth/sesion.php';
+require_once __DIR__ . '/php/dao/InventarioDAO.php';
 requiere_rol(ROL_ADMIN);
 
 $unidades = ['unidades', 'kg', 'g', 'litros', 'ml'];
 
-// PROVISIONAL (Jeremy): consultar('SELECT id, nombre, unidad, stock, stock_minimo FROM insumos ORDER BY nombre')
-$insumos = [
-    ['id' => 1, 'nombre' => 'Café en grano',  'unidad' => 'kg',       'stock' => 8,  'stock_minimo' => 3],
-    ['id' => 2, 'nombre' => 'Leche entera',   'unidad' => 'litros',   'stock' => 4,  'stock_minimo' => 10],
-    ['id' => 3, 'nombre' => 'Azúcar',         'unidad' => 'kg',       'stock' => 12, 'stock_minimo' => 2],
-    ['id' => 4, 'nombre' => 'Vasos de 12 oz', 'unidad' => 'unidades', 'stock' => 40, 'stock_minimo' => 50],
-    ['id' => 5, 'nombre' => 'Limones',        'unidad' => 'unidades', 'stock' => 60, 'stock_minimo' => 20],
-];
+$dao = new InventarioDAO();
 
+$insumos = $dao->listar();
 $stockBajo = array_filter($insumos, fn ($i) => $i['stock'] <= $i['stock_minimo']);
 
 $tituloPagina = 'Inventario';
@@ -88,8 +81,8 @@ require __DIR__ . '/php/partials/cabecera.php';
                                 <tr data-nombre="<?= e($i['nombre']) ?>" data-bajo="<?= $bajo ? '1' : '0' ?>"
                                     <?= $bajo ? 'class="fila-alerta"' : '' ?>>
                                     <th scope="row"><?= e($i['nombre']) ?></th>
-                                    <td class="numero"><?= e((string) $i['stock']) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
-                                    <td class="numero"><?= e((string) $i['stock_minimo']) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
+                                    <td class="numero"><?= e(cantidad((string) $i['stock'])) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
+                                    <td class="numero"><?= e(cantidad((string) $i['stock_minimo'])) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
                                     <td>
                                         <?php if ($bajo): ?>
                                             <span class="insignia insignia-aviso"><?= icono('alerta') ?> Stock bajo</span>
@@ -103,8 +96,8 @@ require __DIR__ . '/php/partials/cabecera.php';
                                                     data-id="<?= (int) $i['id'] ?>"
                                                     data-nombre="<?= e($i['nombre']) ?>"
                                                     data-unidad="<?= e($i['unidad']) ?>"
-                                                    data-stock="<?= e((string) $i['stock']) ?>"
-                                                    data-minimo="<?= e((string) $i['stock_minimo']) ?>"
+                                                    data-stock="<?= e(cantidad((string) $i['stock'])) ?>"
+                                                    data-minimo="<?= e(cantidad((string) $i['stock_minimo'])) ?>"
                                                     aria-label="Editar <?= e($i['nombre']) ?>"><?= icono('editar') ?></button>
                                             <form action="<?= e(url('php/inventario/eliminar.php')) ?>" method="post"
                                                   data-confirmar="¿Eliminar «<?= e($i['nombre']) ?>» del inventario?">

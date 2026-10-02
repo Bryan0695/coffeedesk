@@ -40,3 +40,9 @@ function icono(string $nombre): string
          . ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
          . ($trazos[$nombre] ?? '') . '</svg>';
 }
+
+/** Cantidad sin ceros decimales sobrantes: "7604.000" → "7604", "2.500" → "2.5". */
+function cantidad(string $valor): string
+{
+    return str_contains($valor, '.') ? rtrim(rtrim($valor, '0'), '.') : $valor;
+}

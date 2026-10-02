@@ -17,7 +17,7 @@ if (PHP_SAPI !== 'cli') {
 $raiz = dirname(__DIR__);
 
 // Carpetas que no son endpoints (solo se incluyen o no se publican)
-$carpetasExcluidas = ['.git', '.github', 'config', 'herramientas', 'tests', 'logs', 'php/comun', 'php/partials'];
+$carpetasExcluidas = ['.git', '.github', 'config', 'herramientas', 'tests', 'logs', 'php/comun', 'php/partials', 'php/dao', 'php/models'];
 
 // Archivos sin requiere_*() a propósito: ruta => motivo
 $excepciones = [

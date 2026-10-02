@@ -11,6 +11,7 @@
 
 require_once __DIR__ . '/../auth/sesion.php';
 require_once __DIR__ . '/../conexion.php';
+require_once __DIR__ . '/../dao/InventarioDAO.php';
 
 requiere_rol(ROL_ADMIN, ROL_MESERO);
 
@@ -112,19 +113,61 @@ if ($pedido['estado'] !== 'pendiente') {
     redirigir('pedidos.php');
 }
 
-// Actualizar
+// Actualizar. Al anular, los insumos descontados al registrar el pedido se
+// devuelven en la misma transacción (si algo falla, no cambia nada).
 
-ejecutar(
-    'UPDATE pedidos
-     SET estado = ?
-     WHERE id = ?
-       AND estado = ?',
-    [
-        $nuevoEstado,
-        $id,
-        'pendiente'
-    ]
+$inventarioDAO = new InventarioDAO();
+
+$cambiado = transaccion(
+    function () use ($id, $nuevoEstado, $inventarioDAO): bool {
+
+        // El AND estado = 'pendiente' evita devolver el stock dos veces
+        // si dos personas anulan el mismo pedido a la vez.
+        $filas = ejecutar(
+            'UPDATE pedidos
+             SET estado = ?
+             WHERE id = ?
+               AND estado = ?',
+            [
+                $nuevoEstado,
+                $id,
+                'pendiente'
+            ]
+        );
+
+        if ($filas !== 1) {
+            return false;
+        }
+
+        if ($nuevoEstado === 'anulado') {
+            $lineas = consultar(
+                'SELECT producto_id, cantidad
+                 FROM pedido_detalle
+                 WHERE pedido_id = ?',
+                [$id]
+            );
+
+            foreach ($lineas as $linea) {
+                $inventarioDAO->reponerStock(
+                    (int) $linea['producto_id'],
+                    (int) $linea['cantidad']
+                );
+            }
+        }
+
+        return true;
+    }
 );
+
+if (!$cambiado) {
+
+    mensaje_flash(
+        'error',
+        'Este pedido ya fue procesado y no puede cambiar de estado.'
+    );
+
+    redirigir('pedidos.php');
+}
 
 // Mensaje
 
@@ -139,7 +182,7 @@ if ($nuevoEstado === 'entregado') {
 
     mensaje_flash(
         'exito',
-        'El pedido #' . $id . ' fue anulado.'
+        'El pedido #' . $id . ' fue anulado y su stock se devolvió al inventario.'
     );
 }
 
