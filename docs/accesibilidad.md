@@ -32,12 +32,14 @@ porque quedaba junto al enlace "Inicio" con el mismo destino. En el login (`inde
 
 | Página | Errors | Contrast Errors | Alerts | Features | Structure | ARIA | AIM Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Login | 0 | 0 | **0** | 3 | 6 | 10 | 10/10 |
+| Panel (admin) | 0 | 0 | **0** | 1 | 8 | 18 | 10/10 |
 | Pedidos (mesero) | 0 | 0 | **0** | 6 | 21 | 31 | 10/10 |
 
 Con la corrección ya no aparecen *Possible heading* ni *Redundant link*. Un intento intermedio (logo como enlace) generó
 *Redundant link* en el panel con el rol mesero; se descartó y el resultado final queda sin alertas.
 
-_Pendiente: repetir el resto de páginas con la versión final para completar la tabla._
+_Menú, categorías e inventario usan la misma cabecera que ya salió sin alertas; no se repitieron en WAVE._
 
 ## 3. Revisión manual (criterios de la rúbrica)
 
