@@ -23,7 +23,7 @@ require __DIR__ . '/php/partials/head.php';
 
     <div class="login-contenedor">
         <header class="login-marca">
-            <p class="marca"><span class="marca-logo"><?= icono('taza') ?></span> CoffeeDesk</p>
+            <a class="marca" href="<?= e(url('index.php')) ?>"><span class="marca-logo"><?= icono('taza') ?></span> CoffeeDesk</a>
             <div class="login-lema">
                 <h1>Tu cafetería, en orden.</h1>
                 <p>Pedidos por mesa, menú del día e inventario de la cocina en un solo lugar.</p>
