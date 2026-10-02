@@ -126,8 +126,6 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <ul id="lista-lineas" class="lista-lineas"></ul>
                     <p class="error-campo" id="error-lineas" aria-live="polite"></p>
 
-                    <!-- cambios correspondientes a la logica de datos -->
-                    <!-- Responsable: Gabo -->
                     <button type="button" class="boton-secundario" id="agregar-linea" <?= $productos === [] ? 'disabled' : '' ?>>
                         <?= icono('mas') ?> Agregar producto
                     </button>
@@ -157,8 +155,6 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <output id="total-pedido" for="lista-lineas" aria-live="polite">$0.00</output>
                 </p>
 
-                <!-- cambios correspondientes a la logica de datos -->
-                <!-- Responsable: Gabo -->
                 <button type="submit" class="boton-primario boton-bloque" <?= $productos === [] ? 'disabled' : '' ?>>
                     Registrar pedido
                 </button>
@@ -173,8 +169,6 @@ require __DIR__ . '/php/partials/cabecera.php';
                     <select name="producto_id[]" data-campo="producto" required>
                         <option value="">Elige un producto</option>
 
-                        <!-- cambios correspondientes a la logica de datos -->
-                        <!-- Responsable: Gabo -->
                         <?php foreach ($productos as $p): ?>
                             <option value="<?= (int) $p['id'] ?>" data-precio="<?= (int) $p['precio'] ?>">
                                 <?= e($p['nombre']) ?> — <?= e($p['categoria']) ?> - <?= dinero($p['precio']) ?>
@@ -204,8 +198,6 @@ require __DIR__ . '/php/partials/cabecera.php';
             <?php if ($pedidos === []): ?>
                 <p class="estado-vacio">Todavía no hay pedidos registrados hoy.</p>
             <?php else: ?>
-                <!-- cambios correspondientes a la logica de datos -->
-                <!-- Responsable: Gabo -->
                 <div class="tabla-envoltura" role="region" aria-labelledby="titulo-pedidos-dia" tabindex="0">
                     <table>
                         <thead>
@@ -254,14 +246,14 @@ require __DIR__ . '/php/partials/cabecera.php';
 
                                             <div class="acciones-tabla">
 
-                                                <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post">
+                                                <form action="<?= e(url('php/pedidos/estado.php')) ?>" method="post"
+                                                    data-confirmar="¿Marcar el pedido #<?= (int) $p['id'] ?> como entregado?">
                                                     <?= csrf_campo() ?>
 
                                                     <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                                                     <input type="hidden" name="estado" value="entregado">
 
-                                                    <button type="submit" class="boton-fantasma" title="Entregar Pedido" aria-label="Marcar pedido #<?= (int) $p['id'] ?> como entregado"
-                                                        data-confirmar="¿Marcar el pedido #<?= (int) $p['id'] ?> como entregado?">
+                                                    <button type="submit" class="boton-fantasma" title="Entregar Pedido" aria-label="Marcar pedido #<?= (int) $p['id'] ?> como entregado">
                                                         <?= icono('ok') ?>
                                                     </button>
 

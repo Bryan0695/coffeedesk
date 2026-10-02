@@ -2,9 +2,7 @@
 /**
  * Inventario: insumos con alerta de stock bajo, búsqueda y alta, edición y baja (solo administrador).
  *
- * Vista: Frederick · Lógica y datos: Jeremy.
- * Los nombres de los campos y los archivos de destino son PROVISIONALES
- * hasta que Jeremy entregue los contratos.
+ * Vista: Frederick · Lógica y datos: Jeremy (php/inventario/, php/dao/InventarioDAO.php).
  */
 require_once __DIR__ . '/php/auth/sesion.php';
 require_once __DIR__ . '/php/dao/InventarioDAO.php';
@@ -83,8 +81,8 @@ require __DIR__ . '/php/partials/cabecera.php';
                                 <tr data-nombre="<?= e($i['nombre']) ?>" data-bajo="<?= $bajo ? '1' : '0' ?>"
                                     <?= $bajo ? 'class="fila-alerta"' : '' ?>>
                                     <th scope="row"><?= e($i['nombre']) ?></th>
-                                    <td class="numero"><?= e((string) $i['stock']) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
-                                    <td class="numero"><?= e((string) $i['stock_minimo']) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
+                                    <td class="numero"><?= e(cantidad((string) $i['stock'])) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
+                                    <td class="numero"><?= e(cantidad((string) $i['stock_minimo'])) ?> <span class="texto-suave"><?= e($i['unidad']) ?></span></td>
                                     <td>
                                         <?php if ($bajo): ?>
                                             <span class="insignia insignia-aviso"><?= icono('alerta') ?> Stock bajo</span>
@@ -98,8 +96,8 @@ require __DIR__ . '/php/partials/cabecera.php';
                                                     data-id="<?= (int) $i['id'] ?>"
                                                     data-nombre="<?= e($i['nombre']) ?>"
                                                     data-unidad="<?= e($i['unidad']) ?>"
-                                                    data-stock="<?= e((string) $i['stock']) ?>"
-                                                    data-minimo="<?= e((string) $i['stock_minimo']) ?>"
+                                                    data-stock="<?= e(cantidad((string) $i['stock'])) ?>"
+                                                    data-minimo="<?= e(cantidad((string) $i['stock_minimo'])) ?>"
                                                     aria-label="Editar <?= e($i['nombre']) ?>"><?= icono('editar') ?></button>
                                             <form action="<?= e(url('php/inventario/eliminar.php')) ?>" method="post"
                                                   data-confirmar="¿Eliminar «<?= e($i['nombre']) ?>» del inventario?">
