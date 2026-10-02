@@ -16,6 +16,9 @@
 require_once __DIR__ . '/../auth/sesion.php';
 require_once __DIR__ . '/../conexion.php';
 
+// Cambio para descontar el stock del producto cuando se reliza un pedido.
+require_once __DIR__ . '/../dao/InventarioDAO.php';
+
 requiere_rol(ROL_ADMIN, ROL_MESERO);
 
 // Solo POST
@@ -318,13 +321,16 @@ $totalDb = number_format(
 // Registrar pedido + detalle
 try {
 
+    $inventarioDAO = new InventarioDAO();
+
     $pedidoId = transaccion(
         function () use (
             $mesa,
             $clienteDb,
             $usuarioId,
             $totalDb,
-            $detalle
+            $detalle,
+            $inventarioDAO
         ) {
 
             // Cabecera del pedido
@@ -363,17 +369,32 @@ try {
                      VALUES (?, ?, ?, ?, ?)',
                     [
                         $pedidoId,
-                        $linea['producto_id'],
-                        $linea['cantidad'],
+                        (int) $linea['producto_id'],
+                        (int) $linea['cantidad'],
                         $precioDb,
                         $subtotalDb
                     ]
                 );
+
+                // Descontar insumos correspondientes al producto
+                $inventarioDAO->descontarStock(
+                    (int) $linea['producto_id'],
+                    (int) $linea['cantidad']
+                );
+
             }
 
             return $pedidoId;
         }
     );
+} catch (RuntimeException $e){
+
+    mensaje_flash(
+            'error',
+            'No se pudo registrar el pedido porque uno o más insumos no tienen stock suficiente.'
+        );
+
+        redirigir('pedidos.php');
 
 } catch (mysqli_sql_exception $e) {
 
