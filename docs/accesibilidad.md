@@ -15,8 +15,10 @@ Fecha: 02/10/2026 · Entorno: XAMPP local · Capturas en `docs/evidencias/` (no 
 | Categorías (admin) | 0 | 0 | 1 | 3 | 17 | 33 | 10/10 |
 | Inventario (admin) | 0 | 0 | 1 | 7 | 27 | 79 | 10/10 |
 | Menú (mesero) | 0 | 0 | 1 | 3 | 20 | 15 | 10/10 |
-| Pedidos | _pendiente de captura_ | | | | | | |
-| 404 | _pendiente de captura_ | | | | | | |
+
+Las capturas del antes se tomaron con el logo original. La página de **Pedidos** se capturó ya con la corrección
+(ver sección 2). La **404** no se evalúa con WAVE: es una página de error sin formularios ni datos, y se revisó
+manualmente (sección 3).
 
 **Hallazgo único (alerta repetida en todas las páginas):** *Possible heading* en el nombre "CoffeeDesk" de la cabecera.
 Era un `<p>` grande y en negrita; WAVE lo tomaba por un título sin marcar.
@@ -28,7 +30,14 @@ porque quedaba junto al enlace "Inicio" con el mismo destino. En el login (`inde
 
 ## 2. WAVE — resultado final ("después")
 
-_Pendiente: repetir WAVE tras la corrección y completar Pedidos y 404 (esperado: 0 alertas)._
+| Página | Errors | Contrast Errors | Alerts | Features | Structure | ARIA | AIM Score |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Pedidos (mesero) | 0 | 0 | **0** | 6 | 21 | 31 | 10/10 |
+
+Con la corrección ya no aparecen *Possible heading* ni *Redundant link*. Un intento intermedio (logo como enlace) generó
+*Redundant link* en el panel con el rol mesero; se descartó y el resultado final queda sin alertas.
+
+_Pendiente: repetir el resto de páginas con la versión final para completar la tabla._
 
 ## 3. Revisión manual (criterios de la rúbrica)
 
