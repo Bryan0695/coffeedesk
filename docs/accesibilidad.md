@@ -21,8 +21,10 @@ Fecha: 02/10/2026 · Entorno: XAMPP local · Capturas en `docs/evidencias/` (no 
 **Hallazgo único (alerta repetida en todas las páginas):** *Possible heading* en el nombre "CoffeeDesk" de la cabecera.
 Era un `<p>` grande y en negrita; WAVE lo tomaba por un título sin marcar.
 
-**Corrección:** el logo pasó a ser un enlace al inicio (`<a class="marca" href="…">`) en el login (`index.php`)
-y en la barra lateral (`php/partials/cabecera.php`); estilos en `css/estilos.css` (`.marca`).
+**Corrección:** el nombre ya no es un `<p>` sino un `<span class="marca">` (`php/partials/cabecera.php`).
+
+**Intento descartado:** convertirlo en un enlace al inicio hizo que WAVE avisara *Redundant link* en las páginas internas,
+porque quedaba junto al enlace "Inicio" con el mismo destino. En el login (`index.php`) sí es un enlace, porque allí no hay otro.
 
 ## 2. WAVE — resultado final ("después")
 

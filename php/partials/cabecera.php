@@ -31,7 +31,7 @@ require __DIR__ . '/head.php';
     <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
 
     <header class="barra-lateral">
-        <a class="marca" href="<?= e(url('panel.php')) ?>"><span class="marca-logo"><?= icono('taza') ?></span> CoffeeDesk</a>
+        <span class="marca"><span class="marca-logo"><?= icono('taza') ?></span> CoffeeDesk</span>
 
         <nav aria-label="Navegación principal">
             <ul class="menu-principal">
