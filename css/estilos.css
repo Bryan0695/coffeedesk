@@ -345,7 +345,11 @@ a:hover { color: var(--marca-hover); }
     font-size: 1.125rem;
     font-weight: 700;
     color: #fff;
+    text-decoration: none;
+    width: fit-content;
+    border-radius: var(--radio-s);
 }
+.marca:hover { color: #fff; }
 .marca-logo {
     display: grid;
     place-items: center;
@@ -668,7 +672,8 @@ tbody tr:hover { background: var(--superficie-suave); }
    ========================================================= */
 .pagina-error { display: flex; flex-direction: column; }
 .error-cabecera { padding: 1.25rem 1.5rem; }
-.error-cabecera .marca { padding: 0; color: var(--texto); text-decoration: none; }
+.error-cabecera .marca,
+.error-cabecera .marca:hover { padding: 0; color: var(--texto); }
 
 .error-contenido {
     flex: 1;
