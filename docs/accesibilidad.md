@@ -61,6 +61,28 @@ inventario y 404), en escritorio (1366 px) y en móvil (375 px):
 | Formularios responsivos, sin desplazamiento horizontal a 375 px | ✔ |
 | Mensajes de éxito y error con `role="alert"` | ✔ |
 
-## 4. Lighthouse y Validador W3C
+## 4. Lighthouse (categoría Accessibility)
+
+Lighthouse 13.5.0 (versión de consola, el mismo motor que DevTools), Chrome sin interfaz, 02/10/2026.
+Las páginas internas se auditaron con la sesión iniciada (usuarios de prueba de XAMPP). Informes completos en
+`docs/evidencias/lighthouse/` (HTML y JSON; no se versionan).
+
+| Página | Antes | Después | Auditorías que pasan | Fallos |
+|---|:-:|:-:|:-:|:-:|
+| Login | 100 | **100** | 20 | 0 |
+| Panel (admin) | 100 | **100** | 20 | 0 |
+| Menú (admin) | — | **100** | 30 | 0 |
+| Pedidos (admin) | — | **100** | 30 | 0 |
+| Categorías (admin) | — | **100** | 29 | 0 |
+| Inventario (admin) | — | **100** | 30 | 0 |
+| Menú (mesero) | — | **100** | 30 | 0 |
+| Pedidos (mesero) | — | **100** | 30 | 0 |
+
+"Antes" = rama `main` sin la corrección de WAVE; solo se midieron login y panel, que eran las páginas con alerta.
+Lighthouse no detectó el problema del logo (es una alerta de WAVE, no un fallo de sus reglas automáticas), por eso la
+nota no cambia. Las 10 auditorías "manuales" de Lighthouse (foco lógico, orden de tabulación, etc.) se cubren en la
+revisión manual de la sección 3.
+
+## 5. Validador HTML W3C
 
 _Pendiente._
