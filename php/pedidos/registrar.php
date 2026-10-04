@@ -1,415 +1,140 @@
 <?php
 /**
- * Registro de pedidos.
+ * Registro de pedidos (administrador y mesero).
  *
- * Funciones:
- * - valida sesión y rol;
- * - valida CSRF;
  * - valida mesa, cliente, productos y cantidades;
- * - consulta precios reales en MySQL;
- * - calcula subtotal y total en servidor;
- * - registra pedido y detalle dentro de una transacción.
+ * - toma los precios de MySQL (el total del navegador es solo informativo);
+ * - dentro de una transacción: comprueba que los productos sigan a la venta,
+ *   guarda el pedido y su detalle y descuenta los insumos de cada receta.
  *
  * Responsable: Gabo
  */
 
 require_once __DIR__ . '/../auth/sesion.php';
-require_once __DIR__ . '/../conexion.php';
-
-// Cambio para descontar el stock del producto cuando se reliza un pedido.
+require_once __DIR__ . '/../dao/ProductoDAO.php';
+require_once __DIR__ . '/../dao/PedidoDAO.php';
 require_once __DIR__ . '/../dao/InventarioDAO.php';
 
 requiere_rol(ROL_ADMIN, ROL_MESERO);
+exigir_post_con_csrf('pedidos.php');
 
-// Solo POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    mensaje_flash(
-        'error',
-        'La operación solicitada no es válida.'
-    );
+/**
+ * Lee las listas producto_id[] y cantidad[] del formulario y devuelve
+ * [producto_id => cantidad]. Agrupa los productos repetidos (Capuchino x2 +
+ * Capuchino x1 = Capuchino x3), lo que además respeta el UNIQUE
+ * (pedido_id, producto_id) del detalle. Ante cualquier error redirige.
+ */
+function leer_lineas_pedido(): array
+{
+    $productos  = $_POST['producto_id'] ?? null;
+    $cantidades = $_POST['cantidad'] ?? null;
 
-    redirigir('pedidos.php');
+    if (!is_array($productos) || !is_array($cantidades) || $productos === []) {
+        fallar('Debes agregar al menos un producto al pedido.', 'pedidos.php');
+    }
+    if (count($productos) !== count($cantidades)) {
+        fallar('Los datos del pedido están incompletos.', 'pedidos.php');
+    }
+    if (count($productos) > PEDIDO_MAX_LINEAS) {
+        fallar('La cantidad de productos del pedido no es válida.', 'pedidos.php');
+    }
+
+    $lineas = [];
+    foreach ($productos as $i => $valorProducto) {
+        // a_entero() devuelve null también si llega un array anidado
+        $productoId = id_valido(a_entero($valorProducto));
+        $cantidad   = a_entero($cantidades[$i] ?? null);
+
+        if ($productoId === null) {
+            fallar('Debes seleccionar productos válidos.', 'pedidos.php');
+        }
+        if ($cantidad === null || $cantidad < 1 || $cantidad > PEDIDO_MAX_CANTIDAD) {
+            fallar('La cantidad de cada producto debe estar entre 1 y ' . PEDIDO_MAX_CANTIDAD . '.', 'pedidos.php');
+        }
+
+        $lineas[$productoId] = ($lineas[$productoId] ?? 0) + $cantidad;
+        if ($lineas[$productoId] > PEDIDO_MAX_CANTIDAD) {
+            fallar('La cantidad total de un producto no puede superar ' . PEDIDO_MAX_CANTIDAD . '.', 'pedidos.php');
+        }
+    }
+    return $lineas;
 }
 
-// CSRF
-if (!csrf_valido(post_texto('csrf'))) {
-    mensaje_flash(
-        'error',
-        'La solicitud no pudo verificarse. Recarga la página e inténtalo nuevamente.'
-    );
-
-    redirigir('pedidos.php');
+/**
+ * Precio, subtotal y total en centavos con los precios de la BD.
+ * Devuelve [lineas del detalle, total en centavos].
+ */
+function calcular_detalle(array $productosDb, array $lineas): array
+{
+    $detalle = [];
+    $total = 0;
+    foreach ($productosDb as $producto) {
+        $productoId = (int) $producto['id'];
+        $cantidad   = $lineas[$productoId];
+        $precio     = precio_a_centavos((string) $producto['precio']);
+        $detalle[]  = [
+            'producto_id' => $productoId,
+            'cantidad'    => $cantidad,
+            'precio'      => $precio,
+            'subtotal'    => $precio * $cantidad,
+        ];
+        $total += $precio * $cantidad;
+    }
+    return [$detalle, $total];
 }
 
-
-// Configuración
-$maxMesas = 10;
-$maxCantidad = 20;
-$maxLineas = 50;
-
-// Datos generales
-$mesa = post_entero('mesa');
+// ---- Validación -------------------------------------------------------------
+$mesa    = post_entero('mesa');
 $cliente = trim(post_texto('cliente'));
 
-// Validar mesa
-if ($mesa === null || $mesa < 1 || $mesa > $maxMesas) {
-    mensaje_flash(
-        'error',
-        'Debes seleccionar una mesa válida.'
-    );
-
-    redirigir('pedidos.php');
+if ($mesa === null || $mesa < 1 || $mesa > PEDIDO_MAX_MESAS) {
+    fallar('Debes seleccionar una mesa válida.', 'pedidos.php');
+}
+if (mb_strlen($cliente) > PEDIDO_MAX_CLIENTE) {
+    fallar('El nombre del cliente no puede superar los ' . PEDIDO_MAX_CLIENTE . ' caracteres.', 'pedidos.php');
 }
 
-// Validar cliente\
-if (mb_strlen($cliente) > 60) {
-    mensaje_flash(
-        'error',
-        'El nombre del cliente no puede superar los 60 caracteres.'
-    );
+$lineas    = leer_lineas_pedido();
+$usuarioId = (int) usuario_actual()['id'];
 
-    redirigir('pedidos.php');
-}
+// ---- Registrar ----------------------------------------------------------------
+$productos  = new ProductoDAO();
+$pedidos    = new PedidoDAO();
+$inventario = new InventarioDAO();
 
-// En la base puede guardarse como NULL si quedó vacío.
-$clienteDb = $cliente !== ''
-    ? $cliente
-    : null;
-
-
-// Obtener arrays del formulario
-$productosPost = $_POST['producto_id'] ?? null;
-$cantidadesPost = $_POST['cantidad'] ?? null;
-
-if (
-    !is_array($productosPost)
-    || !is_array($cantidadesPost)
-) {
-    mensaje_flash(
-        'error',
-        'Debes agregar al menos un producto al pedido.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Deben llegar la misma cantidad de productos y cantidades.
-if (count($productosPost) !== count($cantidadesPost)) {
-    mensaje_flash(
-        'error',
-        'Los datos del pedido están incompletos.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-if (
-    count($productosPost) === 0
-    || count($productosPost) > $maxLineas
-) {
-    mensaje_flash(
-        'error',
-        'La cantidad de productos del pedido no es válida.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Convertir y validar líneas
-$lineas = [];
-
-/*
- * Vamos a agrupar productos repetidos.
- * Ejemplo:
- * Capuchino x2
- * Capuchino x1
-
- * se convierte en:
- * Capuchino x3
- *
- * Esto también evita problemas con:
- * UNIQUE (pedido_id, producto_id)
- */
-
-foreach ($productosPost as $indice => $productoValor) {
-
-    $cantidadValor = $cantidadesPost[$indice] ?? null;
-
-    // Un atacante podría enviar arrays anidados.
-    if (
-        !is_string($productoValor)
-        || !is_string($cantidadValor)
-    ) {
-        mensaje_flash(
-            'error',
-            'Uno de los productos enviados no es válido.'
-        );
-
-        redirigir('pedidos.php');
-    }
-
-    $productoId = filter_var(
-        trim($productoValor),
-        FILTER_VALIDATE_INT
-    );
-
-    $cantidad = filter_var(
-        trim($cantidadValor),
-        FILTER_VALIDATE_INT
-    );
-
-    if ($productoId === false || $productoId <= 0) {
-        mensaje_flash(
-            'error',
-            'Debes seleccionar productos válidos.'
-        );
-
-        redirigir('pedidos.php');
-    }
-
-    if (
-        $cantidad === false
-        || $cantidad < 1
-        || $cantidad > $maxCantidad
-    ) {
-        mensaje_flash(
-            'error',
-            'La cantidad de cada producto debe estar entre 1 y '
-            . $maxCantidad
-            . '.'
-        );
-
-        redirigir('pedidos.php');
-    }
-
-    $productoId = (int) $productoId;
-    $cantidad = (int) $cantidad;
-
-    if (!isset($lineas[$productoId])) {
-        $lineas[$productoId] = 0;
-    }
-
-    $lineas[$productoId] += $cantidad;
-
-    // Evitamos que un producto repetido supere el máximo.
-    if ($lineas[$productoId] > $maxCantidad) {
-        mensaje_flash(
-            'error',
-            'La cantidad total de un producto no puede superar '
-            . $maxCantidad
-            . '.'
-        );
-
-        redirigir('pedidos.php');
-    }
-}
-
-if ($lineas === []) {
-    mensaje_flash(
-        'error',
-        'Debes agregar al menos un producto al pedido.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Consultar productos reales
-/*
- * No usamos los precios enviados por JavaScript.
- * Construimos:
- * WHERE p.id IN (?, ?, ?)
- */
-
-$idsProductos = array_keys($lineas);
-
-$marcadores = implode(
-    ', ',
-    array_fill(0, count($idsProductos), '?')
-);
-
-$productosDb = consultar(
-    'SELECT
-        p.id,
-        p.nombre,
-        p.precio,
-        p.disponible
-     FROM productos AS p
-     INNER JOIN categorias AS c
-        ON c.id = p.categoria_id
-     WHERE p.id IN (' . $marcadores . ')
-       AND p.disponible = 1
-       AND p.activo = 1
-       AND c.activo = 1',
-    $idsProductos
-);
-
-// Todos los productos enviados deben seguir disponibles.
-if (count($productosDb) !== count($idsProductos)) {
-    mensaje_flash(
-        'error',
-        'Uno o más productos ya no se encuentran disponibles para la venta.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Función auxiliar para convertir DECIMAL de MySQL a centavos
-function precio_a_centavos(string $precio): int
-{
-    $partes = explode('.', $precio, 2);
-    $entero = (int) ($partes[0] ?? '0');
-    $decimales = $partes[1] ?? '';
-
-    $decimales = str_pad(substr($decimales, 0, 2),2,'0');
-
-    return ($entero * 100) + (int) $decimales;
-}
-
-// Preparar detalle y calcular total
-$detalle = [];
-$totalCentavos = 0;
-
-foreach ($productosDb as $producto) {
-
-    $productoId         = (int) $producto['id'];
-    $cantidad           = $lineas[$productoId];
-    $precioCentavos     = precio_a_centavos((string) $producto['precio']);
-    $subtotalCentavos   = $precioCentavos * $cantidad;
-    $totalCentavos += $subtotalCentavos;
-
-    $detalle[] = [
-        'producto_id'       => $productoId,
-        'nombre'            => $producto['nombre'],
-        'cantidad'          => $cantidad,
-        'precio_centavos'   => $precioCentavos,
-        'subtotal_centavos' => $subtotalCentavos,
-    ];
-}
-
-// Protección adicional.
-if ($totalCentavos <= 0) {
-    mensaje_flash(
-        'error',
-        'No fue posible calcular correctamente el total del pedido.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Usuario que registra el pedido
-$usuario = usuario_actual();
-
-if ($usuario === null) {
-    mensaje_flash(
-        'error',
-        'La sesión ya no se encuentra disponible.'
-    );
-
-    redirigir('index.php');
-}
-
-$usuarioId = (int) $usuario['id'];
-
-// Convertir total a DECIMAL
-$totalDb = number_format(
-    $totalCentavos / 100,
-    2,
-    '.',
-    ''
-);
-
-// Registrar pedido + detalle
 try {
+    $pedidoId = transaccion(function () use ($mesa, $cliente, $usuarioId, $lineas, $productos, $pedidos, $inventario): int {
+        // Dentro de la transacción: un producto marcado como agotado a la vez no se vende
+        $productosDb = $productos->obtenerParaVenta(array_keys($lineas));
+        [$detalle, $total] = calcular_detalle($productosDb, $lineas);
 
-    $inventarioDAO = new InventarioDAO();
+        $pedidoId = $pedidos->crear($mesa, $cliente !== '' ? $cliente : null, $usuarioId, centavos_a_decimal($total));
 
-    $pedidoId = transaccion(
-        function () use (
-            $mesa,
-            $clienteDb,
-            $usuarioId,
-            $totalDb,
-            $detalle,
-            $inventarioDAO
-        ) {
-
-            // Cabecera del pedido
-            $pedidoId = insertar(
-                'INSERT INTO pedidos (
-                    mesa,
-                    cliente,
-                    registrado_por,
-                    estado,
-                    total
-                 )
-                 VALUES (?, ?, ?, ?, ?)',
-                [
-                    $mesa,
-                    $clienteDb,
-                    $usuarioId,
-                    'pendiente',
-                    $totalDb
-                ]
+        foreach ($detalle as $linea) {
+            $pedidos->agregarLinea(
+                $pedidoId,
+                $linea['producto_id'],
+                $linea['cantidad'],
+                centavos_a_decimal($linea['precio']),
+                centavos_a_decimal($linea['subtotal'])
             );
-
-            // Detalle
-            foreach ($detalle as $linea) {
-
-                $precioDb = number_format($linea['precio_centavos'] / 100,2,'.','');
-                $subtotalDb = number_format($linea['subtotal_centavos'] / 100,2,'.','');
-
-                insertar(
-                    'INSERT INTO pedido_detalle (
-                        pedido_id,
-                        producto_id,
-                        cantidad,
-                        precio_unitario,
-                        subtotal
-                     )
-                     VALUES (?, ?, ?, ?, ?)',
-                    [
-                        $pedidoId,
-                        (int) $linea['producto_id'],
-                        (int) $linea['cantidad'],
-                        $precioDb,
-                        $subtotalDb
-                    ]
-                );
-
-                // Descontar insumos correspondientes al producto
-                $inventarioDAO->descontarStock(
-                    (int) $linea['producto_id'],
-                    (int) $linea['cantidad']
-                );
-
-            }
-
-            return $pedidoId;
+            $inventario->descontarStock($pedidoId, $linea['producto_id'], $linea['cantidad']);
         }
-    );
-} catch (RuntimeException $e){
-
-    mensaje_flash(
-            'error',
-            'No se pudo registrar el pedido porque uno o más insumos no tienen stock suficiente.'
-        );
-
-        redirigir('pedidos.php');
-
+        return $pedidoId;
+    });
+} catch (ProductoNoDisponibleException $e) {
+    fallar('Uno o más productos ya no se encuentran disponibles para la venta.', 'pedidos.php');
+} catch (StockInsuficienteException $e) {
+    fallar('No se pudo registrar el pedido: no hay stock suficiente de "' . $e->getInsumo() . '".', 'pedidos.php');
 } catch (mysqli_sql_exception $e) {
-
-    /*
-     * Puede ocurrir, por ejemplo, si un producto deja de existir
-     * entre la consulta y el INSERT.
-     * La transacción ya habrá realizado rollback.
-     */
+    // La transacción ya hizo rollback. 1213 (deadlock) y 1205 (espera de bloqueo
+    // agotada) pasan cuando dos pedidos usan los mismos insumos a la vez: basta
+    // con reintentar. Cualquier otro error lo registra el manejador global.
+    if (in_array($e->getCode(), [1205, 1213], true)) {
+        error_log('[CoffeeDesk] Pedido no registrado por concurrencia: ' . $e->getMessage());
+        fallar('Otro pedido se estaba registrando al mismo tiempo. Inténtalo nuevamente.', 'pedidos.php');
+    }
     throw $e;
 }
 
-// Resultado final 
-mensaje_flash(
-    'exito',
-    'El pedido #' . $pedidoId . ' se registró correctamente.'
-);
-
-redirigir('pedidos.php');
+terminar('exito', 'El pedido #' . $pedidoId . ' se registró correctamente.', 'pedidos.php');

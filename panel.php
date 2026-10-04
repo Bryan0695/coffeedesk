@@ -14,6 +14,7 @@ $modulos = [
         : 'Consulta productos, precios y disponibilidad.'],
 ];
 if (es_admin()) {
+    $modulos[] = ['categorias.php', 'categorias', 'Categorías', 'Organiza las categorías en las que se agrupa el menú.'];
     $modulos[] = ['inventario.php', 'inventario', 'Inventario', 'Controla el stock de insumos y revisa las alertas.'];
 }
 

@@ -1,13 +1,32 @@
 <?php
 /**
  * Mensajes de éxito / error / aviso que sobreviven a una redirección.
- * Requiere una sesión iniciada y php/comun/html.php (e()).
+ * Requiere una sesión iniciada, php/comun/html.php (e()) y php/comun/respuesta.php (redirigir()).
  */
 
 /** tipo: 'exito' | 'error' | 'aviso' */
 function mensaje_flash(string $tipo, string $texto): void
 {
     $_SESSION['flash'] = ['tipo' => $tipo, 'texto' => $texto];
+}
+
+/**
+ * Guarda un mensaje de error y redirige a $volver. Termina la ejecución, así
+ * cada validación de un endpoint ocupa una línea:
+ *
+ *   if ($id === null) { fallar('El producto no es válido.', 'menu.php'); }
+ */
+function fallar(string $mensaje, string $volver): void
+{
+    mensaje_flash('error', $mensaje);
+    redirigir($volver);
+}
+
+/** Igual que fallar(), pero con un mensaje de éxito o aviso. */
+function terminar(string $tipo, string $mensaje, string $volver): void
+{
+    mensaje_flash($tipo, $mensaje);
+    redirigir($volver);
 }
 
 /** ¿Hay un mensaje pendiente de mostrar? (no lo consume) */

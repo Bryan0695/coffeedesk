@@ -1,7 +1,7 @@
 # CoffeeDesk — integración continua (F-018)
 # 1) Sintaxis en la versión más antigua soportada (XAMPP, 8.0) y en una reciente.
 # 2) Control de acceso: todo endpoint llama a requiere_*().
-# 3) Pruebas de integración con MySQL 8 real y el servidor embebido de PHP.
+# 3) Pruebas de módulos e integración con MySQL 8 real y el servidor embebido de PHP.
 name: ci
 
 on:
@@ -30,6 +30,9 @@ jobs:
 
       - name: Todo endpoint llama a requiere_*()
         run: php tests/verificar_endpoints.php
+
+      - name: Conversión de importes (php/comun/dinero.php)
+        run: php tests/dinero.php
 
   integracion:
     name: integracion  # nombre exigido por la regla de main
@@ -98,6 +101,11 @@ jobs:
             sleep 1
           done
           echo "php -S no respondió"; cat /tmp/php-server.log; exit 1
+
+      - name: Pruebas de módulos (categorías, menú, inventario, recetas y pedidos)
+        env:
+          MYSQL_CMD: mysql -h 127.0.0.1 -P 3306 -uroot -proot coffeedesk
+        run: bash tests/modulos.sh http://127.0.0.1:8000
 
       - name: Pruebas de integración
         env:

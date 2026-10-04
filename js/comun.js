@@ -5,7 +5,7 @@
  *   propio HTML (required, min, max, step, maxlength). El servidor vuelve a validar.
  *   El mensaje de cada campo va en el elemento con id "error-<id del campo>".
  * - Pide confirmación antes de enviar formularios con data-confirmar (eliminar).
- * - filtrarTabla() y modoEdicion(): los usan menu.js e inventario.js.
+ * - filtrarTabla() y modoEdicion(): los usan menu.js, inventario.js y categorias.js.
  */
 
 function mensajeError(campo) {
@@ -18,7 +18,10 @@ function mensajeError(campo) {
     if (v.badInput) return 'Escribe un número válido.';
     if (v.rangeUnderflow) return 'El valor mínimo es ' + campo.min + '.';
     if (v.rangeOverflow) return 'El valor máximo es ' + campo.max + '.';
-    if (v.stepMismatch) return campo.step === '1' ? 'Escribe un número entero.' : 'Usa como máximo 2 decimales.';
+    if (v.stepMismatch) {
+        const decimales = (campo.step.split('.')[1] || '').length;
+        return decimales === 0 ? 'Escribe un número entero.' : `Usa como máximo ${decimales} decimales.`;
+    }
     return campo.validationMessage;
 }
 
@@ -86,11 +89,32 @@ function filtrarTabla(tabla, cumple) {
 /**
  * Los botones [data-editar] cargan su fila en el formulario (rellenar recibe su dataset).
  * "Cancelar edición" vuelve al modo agregar y devuelve el foco al botón que se pulsó.
+ * Los enlaces "Nuevo …" (href="#id-del-form") también vuelven al modo agregar; si no,
+ * guardarían sobre el registro que se estaba editando.
  */
 function modoEdicion({ form, titulo, textoAgregar, textoEditar, rellenar }) {
     const cancelar = form.querySelector('#cancelar-edicion');
     const campoId = form.elements.id;
     let botonOrigen = null;
+
+    function modoAgregar() {
+        form.reset();
+        limpiarErrores(form);
+        // reset() no vacía los hidden (id, stock_original…): se limpian a mano, salvo el token
+        form.querySelectorAll('input[type="hidden"]:not([name="csrf"])').forEach((c) => { c.value = ''; });
+        titulo.textContent = textoAgregar;
+        cancelar.hidden = true;
+    }
+
+    // getAttribute: form.id devolvería el <input name="id"> del propio formulario
+    document.querySelectorAll(`a[href="#${form.getAttribute('id')}"]`).forEach((enlace) => {
+        enlace.addEventListener('click', (evento) => {
+            // Sin el salto al ancla, que quitaría el foco; focus() ya desplaza hasta el campo
+            evento.preventDefault();
+            modoAgregar();
+            form.querySelector('input:not([type="hidden"])').focus();
+        });
+    });
 
     document.addEventListener('click', (evento) => {
         const boton = evento.target.closest('[data-editar]');
@@ -106,11 +130,7 @@ function modoEdicion({ form, titulo, textoAgregar, textoEditar, rellenar }) {
     });
 
     cancelar.addEventListener('click', () => {
-        form.reset();
-        limpiarErrores(form);
-        campoId.value = '';
-        titulo.textContent = textoAgregar;
-        cancelar.hidden = true;
+        modoAgregar();
         if (botonOrigen) botonOrigen.focus();
     });
 }

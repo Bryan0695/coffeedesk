@@ -3,7 +3,7 @@
  * Token CSRF para formularios POST.
  *
  *   <form method="post"> <?= csrf_campo() ?> … </form>
- *   if (!csrf_valido(post_texto('csrf'))) { … }
+ *   exigir_post_con_csrf('menu.php');   // al inicio de cada endpoint que cambia datos
  */
 
 function csrf_token(): string
@@ -30,4 +30,15 @@ function csrf_valido($token): bool
     return is_string($token)
         && !empty($_SESSION['csrf'])
         && hash_equals($_SESSION['csrf'], $token);
+}
+
+/**
+ * Los endpoints que cambian datos solo aceptan POST con un token CSRF válido.
+ * Si no se cumple, guarda el mensaje de error y redirige a $volver.
+ */
+function exigir_post_con_csrf(string $volver): void
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valido($_POST['csrf'] ?? null)) {
+        fallar('La solicitud no pudo verificarse. Recarga la página e inténtalo nuevamente.', $volver);
+    }
 }

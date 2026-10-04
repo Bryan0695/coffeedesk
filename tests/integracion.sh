@@ -16,8 +16,10 @@
 # Requiere la base con 01, 02 y 90 importados (usuarios de prueba admin y mesero).
 #
 # Presupuesto de intentos fallidos (límites: 5 por usuario, 20 por IP en 5 min):
-#   P-04 admin 1 (se borra al entrar bien en P-05) · tiempos: admin 3 + inexistente 3
+#   P-04 admin 1 (se borra al entrar bien en P-05) · M1: 5 de admin desde OTRA IP
+#   (no cuentan para la IP local y se borran) · tiempos: admin 3 + inexistente 3
 #   · P-09: mesero 5  → IP = 11 antes de la prueba opcional del límite por IP.
+#   El límite por usuario cuenta solo los fallos de ese usuario desde la misma IP.
 # =========================================================================
 set -u
 
@@ -185,6 +187,21 @@ codigo="$(pedir "$J" POST php/auth/logout.php --data 'csrf[]=x')"
 [ "$codigo" = 302 ] && ok "logout con csrf[] → 302 (no 500)" || fallo "logout con csrf[]" "HTTP $codigo"
 
 # ------------------------------------------------------------------------
+if [ -n "${MYSQL_CMD:-}" ]; then
+    seccion "Fallos desde otra IP no bloquean la cuenta (M1)"
+    # 5 fallos de admin desde otra IP (un atacante que quiere dejarlo fuera)
+    for i in 1 2 3 4 5; do
+        echo "INSERT INTO intentos_login (usuario, ip) VALUES ('admin', '203.0.113.9');" | $MYSQL_CMD
+    done
+    J="$(nuevo_jar)"
+    codigo="$(login "$J" admin 'Admin123*')"; loc="$(ubicacion)"
+    [ "$codigo" = 302 ] && [ "${loc%/panel.php}" != "$loc" ] \
+        && ok "admin entra desde su equipo aunque otra IP acumule 5 fallos con su usuario" \
+        || fallo "Otra IP bloquea al admin" "HTTP $codigo → $loc"
+    echo "DELETE FROM intentos_login WHERE ip = '203.0.113.9';" | $MYSQL_CMD
+fi
+
+# ------------------------------------------------------------------------
 seccion "Tiempo de respuesta: usuario existente vs inexistente (F-003)"
 J="$(nuevo_jar)"
 # El orden se alterna en cada ronda para que el calentamiento no favorezca a ninguno
@@ -238,6 +255,7 @@ if [ "${CON_APACHE:-0}" = 1 ]; then
     J="$(nuevo_jar)"
     for ruta in README.md .git/HEAD .htaccess .gitignore \
                 config/credenciales.php config/credenciales.example.php config/constantes.php \
+                CONFIG/credenciales.php Config/constantes.php PHP/COMUN/html.php php/DAO/PedidoDAO.php \
                 sql/01_usuarios_roles.sql logs/php_error.log docs/plan_pruebas.md \
                 php/partials/cabecera.php php/comun/html.php \
                 herramientas/crear_admin.php tests/integracion.sh; do
@@ -246,7 +264,8 @@ if [ "${CON_APACHE:-0}" = 1 ]; then
     done
     # php/auth/: librerías bloqueadas (también un archivo futuro que no existe: bloqueo por defecto)
     for ruta in php/auth/sesion.php php/auth/csrf.php php/auth/autorizacion.php \
-                php/auth/arranque_sesion.php php/auth/limite_intentos.php php/auth/archivo_nuevo.php; do
+                php/auth/arranque_sesion.php php/auth/limite_intentos.php php/auth/archivo_nuevo.php \
+                php/AUTH/csrf.php Php/Auth/Sesion.php; do
         codigo="$(pedir "$J" GET "$ruta")"
         [ "$codigo" = 403 ] && ok "403 en /$ruta (librería)" || fallo "/$ruta accesible" "HTTP $codigo"
     done

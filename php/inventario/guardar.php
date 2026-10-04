@@ -1,69 +1,55 @@
 <?php
 /**
- * Crear, editar y reactivar insumos.
+ * Crear, editar y reactivar insumos (solo administrador).
  *
- * id vacío:
- *   - crea un insumo nuevo;
- *   - o reactiva uno eliminado con el mismo nombre (el nombre es UNIQUE).
- *
- * id con valor:
- *   - edita un insumo activo existente.
+ * id vacío:      crea el insumo o, si hay uno eliminado con el mismo nombre, lo reactiva.
+ * id con valor:  edita un insumo activo.
  *
  * Responsable: Jeremy
  */
 
 require_once __DIR__ . '/../auth/sesion.php';
 require_once __DIR__ . '/../dao/InventarioDAO.php';
-require_once __DIR__ . '/../models/Insumo.php';
 
 requiere_rol(ROL_ADMIN);
+exigir_post_con_csrf('inventario.php');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_valido(post_texto('csrf'))) {
-    mensaje_flash('error', 'Solicitud no válida.');
-    redirigir('inventario.php');
+$volverAlForm = 'inventario.php#form-insumo';
+
+$esEdicion     = trim(post_texto('id')) !== '';
+$id            = $esEdicion ? post_id('id') : null;
+$nombre        = trim(post_texto('nombre'));
+$unidad        = trim(post_texto('unidad'));
+$stock         = trim(post_texto('stock'));
+$stockMinimo   = trim(post_texto('stock_minimo'));
+$stockOriginal = trim(post_texto('stock_original'));
+
+// ---- Validación -------------------------------------------------------------
+if ($esEdicion && $id === null) {
+    fallar('El identificador del insumo no es válido.', $volverAlForm);
 }
-
-$idTexto     = trim(post_texto('id'));
-$nombre      = trim(post_texto('nombre'));
-$unidad      = trim(post_texto('unidad'));
-$stock       = trim(post_texto('stock'));
-$stockMinimo = trim(post_texto('stock_minimo'));
-
-$esEdicion = $idTexto !== '';
-$id        = $esEdicion ? post_entero('id') : null;
+if (!largo_valido($nombre, NOMBRE_MAX_INSUMO)) {
+    fallar('El nombre debe tener entre 1 y ' . NOMBRE_MAX_INSUMO . ' caracteres.', $volverAlForm);
+}
+if (!in_array($unidad, UNIDADES_INSUMO, true)) {
+    fallar('Unidad inválida.', $volverAlForm);
+}
+if (!cantidad_valida($stock)) {
+    fallar('El stock debe ser un número entre 0 y 99999 con hasta 3 decimales.', $volverAlForm);
+}
+if (!cantidad_valida($stockMinimo)) {
+    fallar('El stock mínimo debe ser un número entre 0 y 99999 con hasta 3 decimales.', $volverAlForm);
+}
+if ($esEdicion && !cantidad_valida($stockOriginal)) {
+    fallar('Recarga la página y vuelve a editar el insumo.', $volverAlForm);
+}
 
 $dao = new InventarioDAO();
 
-// ---- Validación -------------------------------------------------------------
-$errores = [];
-
-if ($esEdicion && ($id === null || $id <= 0)) {
-    $errores[] = 'El identificador del insumo no es válido.';
-}
-if (mb_strlen($nombre) < 1 || mb_strlen($nombre) > 80) {
-    $errores[] = 'El nombre debe tener entre 1 y 80 caracteres.';
-}
-if (!in_array($unidad, ['unidades', 'kg', 'g', 'litros', 'ml'], true)) {
-    $errores[] = 'Unidad inválida.';
-}
-if (!is_numeric($stock) || (float) $stock < 0 || (float) $stock > 99999) {
-    $errores[] = 'El stock debe ser un número entre 0 y 99999.';
-}
-if (!is_numeric($stockMinimo) || (float) $stockMinimo < 0 || (float) $stockMinimo > 99999) {
-    $errores[] = 'El stock mínimo debe ser un número entre 0 y 99999.';
-}
-
-if ($errores) {
-    mensaje_flash('error', $errores[0]);
-    redirigir('inventario.php#form-insumo');
-}
-
-// ---- Editar: el insumo debe existir y estar activo ---------------------------
 if ($esEdicion) {
     $actual = $dao->obtenerPorId($id);
     if ($actual === null || (int) $actual['activo'] !== 1) {
-        mensaje_flash('error', 'El insumo que intentas editar no existe o fue eliminado.');
-        redirigir('inventario.php');
+        fallar('El insumo que intentas editar no existe o fue eliminado.', 'inventario.php');
     }
 }
 
@@ -71,32 +57,50 @@ if ($esEdicion) {
 $existente = $dao->obtenerPorNombre($nombre, $id ?? 0);
 
 if ($existente !== null && (int) $existente['activo'] === 1) {
-    mensaje_flash('error', 'Ya existe un insumo con ese nombre.');
-    redirigir('inventario.php#form-insumo');
+    fallar('Ya existe un insumo con ese nombre.', $volverAlForm);
 }
 if ($existente !== null && $esEdicion) {
-    mensaje_flash('error', 'Ese nombre pertenece a un insumo eliminado; créalo de nuevo para reactivarlo.');
-    redirigir('inventario.php#form-insumo');
+    fallar('Ese nombre pertenece a un insumo eliminado; créalo de nuevo para reactivarlo.', $volverAlForm);
 }
 
 // ---- Guardar ------------------------------------------------------------------
-$insumo = new Insumo();
-$insumo->setNombre($nombre);
-$insumo->setUnidad($unidad);
-$insumo->setStock((float) $stock);
-$insumo->setStockMinimo((float) $stockMinimo);
-$insumo->setActivo(1);
+$insumo = new Insumo($nombre, $unidad, $stock, $stockMinimo, $id);
 
-if ($esEdicion) {
-    $insumo->setId($id);
-    $dao->actualizar($insumo);
-    mensaje_flash('exito', 'Insumo actualizado.');
-} elseif ($existente !== null) {
-    $dao->reactivar((int) $existente['id'], $insumo);
-    mensaje_flash('exito', 'El insumo "' . $nombre . '" volvió al inventario.');
-} else {
+try {
+    if ($esEdicion) {
+        if (!$dao->actualizar($insumo, $stockOriginal)) {
+            $ahora = $dao->obtenerPorId($id);
+            fallar('El stock de "' . $nombre . '" cambió mientras editabas (ahora hay '
+                . cantidad((string) $ahora['stock']) . ' ' . $ahora['unidad'] . '). Revisa el valor y vuelve a guardar.',
+                'inventario.php');
+        }
+        terminar('exito', mensaje_edicion($actual['stock'], $stock, $stockOriginal, $unidad), 'inventario.php');
+    }
+    if ($existente !== null) {
+        $dao->reactivar((int) $existente['id'], $insumo);
+        terminar('exito', 'El insumo "' . $nombre . '" volvió al inventario.', 'inventario.php');
+    }
     $dao->crear($insumo);
-    mensaje_flash('exito', 'Insumo registrado.');
+    terminar('exito', 'Insumo registrado.', 'inventario.php');
+} catch (mysqli_sql_exception $e) {
+    // 1062 = nombre duplicado: dos administradores guardaron el mismo nombre a la vez
+    if ($e->getCode() === 1062) {
+        fallar('Ya existe un insumo con ese nombre.', $volverAlForm);
+    }
+    throw $e;
 }
 
-redirigir('inventario.php');
+/**
+ * Si hubo ventas o anulaciones mientras se editaba (el stock en la BD ya no
+ * era el que vio el administrador), se avisa que se aplicó solo la diferencia.
+ */
+function mensaje_edicion(string $stockEnBd, string $stockNuevo, string $stockOriginal, string $unidad): string
+{
+    if ((float) $stockEnBd === (float) $stockOriginal || (float) $stockNuevo === (float) $stockOriginal) {
+        return 'Insumo actualizado.';
+    }
+    $diferencia = (float) $stockNuevo - (float) $stockOriginal;
+    return 'Insumo actualizado. Hubo movimientos mientras editabas, así que se '
+        . ($diferencia > 0 ? 'sumaron ' : 'restaron ') . cantidad((string) abs($diferencia))
+        . ' ' . $unidad . ' al stock actual en lugar de reemplazarlo.';
+}

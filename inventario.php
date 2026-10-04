@@ -6,14 +6,11 @@
  */
 require_once __DIR__ . '/php/auth/sesion.php';
 require_once __DIR__ . '/php/dao/InventarioDAO.php';
+
 requiere_rol(ROL_ADMIN);
 
-$unidades = ['unidades', 'kg', 'g', 'litros', 'ml'];
-
-$dao = new InventarioDAO();
-
-$insumos = $dao->listar();
-$stockBajo = array_filter($insumos, fn ($i) => $i['stock'] <= $i['stock_minimo']);
+$insumos   = (new InventarioDAO())->listar();
+$stockBajo = array_filter($insumos, static fn (array $i): bool => (bool) $i['bajo']);
 
 $tituloPagina = 'Inventario';
 $scripts = ['js/comun.js', 'js/inventario.js'];
@@ -77,7 +74,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                         </thead>
                         <tbody>
                             <?php foreach ($insumos as $i): ?>
-                                <?php $bajo = $i['stock'] <= $i['stock_minimo']; ?>
+                                <?php $bajo = (bool) $i['bajo']; ?>
                                 <tr data-nombre="<?= e($i['nombre']) ?>" data-bajo="<?= $bajo ? '1' : '0' ?>"
                                     <?= $bajo ? 'class="fila-alerta"' : '' ?>>
                                     <th scope="row"><?= e($i['nombre']) ?></th>
@@ -121,10 +118,12 @@ require __DIR__ . '/php/partials/cabecera.php';
                 <form id="form-insumo" action="<?= e(url('php/inventario/guardar.php')) ?>" method="post" novalidate data-validar>
                     <?= csrf_campo() ?>
                     <input type="hidden" id="insumo-id" name="id" value="">
+                    <!-- Stock que se vio al pulsar Editar: el servidor aplica solo la diferencia -->
+                    <input type="hidden" id="insumo-stock-original" name="stock_original" value="">
 
                     <div class="campo">
                         <label for="insumo-nombre">Nombre</label>
-                        <input type="text" id="insumo-nombre" name="nombre" required maxlength="80"
+                        <input type="text" id="insumo-nombre" name="nombre" required maxlength="<?= NOMBRE_MAX_INSUMO ?>"
                                aria-describedby="error-insumo-nombre">
                         <p class="error-campo" id="error-insumo-nombre" aria-live="polite"></p>
                     </div>
@@ -132,7 +131,7 @@ require __DIR__ . '/php/partials/cabecera.php';
                         <label for="insumo-unidad">Unidad</label>
                         <select id="insumo-unidad" name="unidad" required aria-describedby="error-insumo-unidad">
                             <option value="">Elige una unidad</option>
-                            <?php foreach ($unidades as $u): ?>
+                            <?php foreach (UNIDADES_INSUMO as $u): ?>
                                 <option value="<?= e($u) ?>"><?= e($u) ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -142,14 +141,14 @@ require __DIR__ . '/php/partials/cabecera.php';
                         <div class="campo">
                             <label for="insumo-stock">Stock actual</label>
                             <input type="number" id="insumo-stock" name="stock" required
-                                   min="0" max="99999" step="0.01" inputmode="decimal"
+                                   min="0" max="99999" step="0.001" inputmode="decimal"
                                    aria-describedby="error-insumo-stock">
                             <p class="error-campo" id="error-insumo-stock" aria-live="polite"></p>
                         </div>
                         <div class="campo">
                             <label for="insumo-minimo">Stock mínimo</label>
                             <input type="number" id="insumo-minimo" name="stock_minimo" required
-                                   min="0" max="99999" step="0.01" inputmode="decimal"
+                                   min="0" max="99999" step="0.001" inputmode="decimal"
                                    aria-describedby="error-insumo-minimo">
                             <p class="error-campo" id="error-insumo-minimo" aria-live="polite"></p>
                         </div>

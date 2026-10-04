@@ -44,9 +44,15 @@ if ($errores) {
     redirigir('index.php');
 }
 
-// 3. Límite de intentos fallidos por usuario e IP (F-002). Va antes de
-//    consultar al usuario: al superarlo, ni la clave correcta entra.
+// 3. Límite de intentos fallidos por usuario + IP y por IP (F-002, M1). Va antes
+//    de consultar al usuario: al superarlo, ni la clave correcta entra. Los
+//    intentos de una misma IP se atienden de uno en uno (B1).
 $ip = ip_cliente();
+if (!esperar_turno_de_login($ip)) {
+    $_SESSION['login_usuario_previo'] = $usuario;
+    mensaje_flash('error', 'El servidor está ocupado. Inténtalo de nuevo en unos segundos.');
+    redirigir('index.php');
+}
 if (login_bloqueado($usuario, $ip)) {
     $_SESSION['login_usuario_previo'] = $usuario;
     mensaje_flash('error', 'Demasiados intentos fallidos. Espera ' . LOGIN_MINUTOS_BLOQUEO . ' minuto(s).');
@@ -91,7 +97,7 @@ if (password_needs_rehash($fila['clave_hash'], PASSWORD_DEFAULT, HASH_OPCIONES))
 
 // 7. Registrar último acceso y limpiar los intentos fallidos
 ejecutar('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?', [(int) $fila['id']]);
-limpiar_intentos($usuario);
+limpiar_intentos($usuario, $ip);
 
 // 8. Abrir sesión
 unset($_SESSION['login_usuario_previo']);

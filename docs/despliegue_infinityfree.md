@@ -18,7 +18,7 @@ Responsable: Bryan Gallegos · Apoyo: Gabo
 
 ## 3. Importar las tablas
 1. En **MySQL Databases** → botón **phpMyAdmin** junto a la base.
-2. **Importar**, en orden: `01_usuarios_roles.sql`, `02_intentos_login.sql` y después los de Gabo y Jeremy (`03_…`, `04_…`).
+2. **Importar**, en orden: `01_usuarios_roles.sql`, `02_intentos_login.sql` y después del `03_…` al `08_pedido_insumo.sql`. Si la base del hosting ya existía, importa solo los que falten (mira `esquema_version`), justo antes de subir el código nuevo y sin registrar pedidos entre medio.
 3. **No** importar:
    - `00_crear_bd_local.sql` (InfinityFree no permite `CREATE DATABASE`).
    - ⚠ **`90_seed_solo_local.sql` ni ningún `9X_`**: crean usuarios con contraseñas públicas (`admin / Admin123*`). Con eso cualquiera entraría como administrador.
@@ -43,7 +43,7 @@ Guarda esa contraseña en un lugar seguro. No la escribas en el repositorio, el 
    git archive --format=zip -o coffeedesk-deploy.zip main
    ```
 2. Descomprimir el zip en una carpeta aparte (no encima de tu repo).
-3. En esa carpeta, copiar `config/credenciales.hosting.example.php` como `config/credenciales.php` y completar el bloque `bd` con los datos del paso 2. Dejar `'entorno' => 'hosting'` y `'forzar_https' => false` por ahora.
+3. En esa carpeta, copiar `config/credenciales.hosting.example.php` como `config/credenciales.php`, completar el bloque `bd` con los datos del paso 2 y escribir en `'dominio'` el dominio del §1 (sin `https://`). Dejar `'entorno' => 'hosting'` y `'forzar_https' => false` solo hasta el §7.
 
 ## 6. Subir archivos
 Opción A — **File Manager** del panel (sencillo): abrir `htdocs/`, borrar el `index2.html` de ejemplo y subir el **contenido** de la carpeta descomprimida (no la carpeta en sí).
@@ -57,10 +57,13 @@ La carpeta `logs/` sí se sube (con su `.htaccess`). Si `logs/php_error.log` no 
 ## 7. Activar HTTPS
 1. Panel → **SSL Certificates** → pedir el certificado gratuito para el dominio y esperar la validación.
 2. Abrir `https://<dominio>/` y comprobar que carga sin avisos del navegador.
-3. **Solo entonces** cambiar `'forzar_https' => true` en `config/credenciales.php` del hosting. Con eso se redirige `http://` → `https://` y se envía HSTS.
+3. **Solo entonces** cambiar `'forzar_https' => true` en `config/credenciales.php` del hosting. Con eso se redirige `http://` → `https://` (al `dominio` de ese archivo, nunca al `Host` que envía el navegador) y se envía HSTS. **No lo dejes en `false`**: mientras lo esté, la cookie de sesión viaja sin cifrar y un mesero conectado por `http://` a la wifi del local puede perder su sesión a manos de otro equipo de la misma red.
+   Cuando lleve unos días funcionando sin bucles ni avisos de certificado, sube `HSTS_SEGUNDOS` en `config/constantes.php` de 300 a 31536000 (1 año).
 4. Si al activarlo la página entra en un bucle de redirecciones, vuelve a `false`: el proxy de InfinityFree no está informando que la petición es HTTPS (ver §8, "Detrás del proxy").
 
-La cookie de sesión se marca `Secure` automáticamente cuando la petición llega por HTTPS.
+La cookie de sesión se marca `Secure` cuando la petición llega por HTTPS o `forzar_https` está activo.
+
+Comprueba también con `diag.php` (§8) qué valor de `REMOTE_ADDR` llega: si es siempre la misma IP del proxy, el límite de 20 intentos fallidos por IP bloquearía a todos los usuarios a la vez; en ese caso avísalo en el grupo antes de la presentación.
 
 ## 8. Verificar
 Checklist (capturas de cada punto para el informe):

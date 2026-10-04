@@ -16,7 +16,7 @@ function iniciar_sesion(): void
     session_set_cookie_params([
         'lifetime' => 0,          // se borra al cerrar el navegador
         'path'     => BASE_URL === '' ? '/' : BASE_URL . '/',
-        'secure'   => es_https(), // solo por HTTPS cuando exista
+        'secure'   => FORZAR_HTTPS || es_https(), // solo por HTTPS cuando exista
         'httponly' => true,       // JavaScript no puede leer la cookie
         'samesite' => 'Lax',
     ]);

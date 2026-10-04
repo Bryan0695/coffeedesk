@@ -21,35 +21,29 @@ if (!file_exists($archivoCredenciales)) {
 $credenciales = require $archivoCredenciales;
 
 // ---- 2. Entorno (F-004) --------------------------------------------------
-// Formato nuevo: el propio archivo declara su entorno. El servidor decide,
-// no la cabecera Host que envía el navegador.
-if (is_array($credenciales) && array_key_exists('entorno', $credenciales)) {
-    if (!in_array($credenciales['entorno'], ['local', 'hosting'], true) || !isset($credenciales['bd'])) {
-        http_response_code(500);
-        exit('config/credenciales.php debe declarar entorno = local | hosting y el bloque bd.');
-    }
-    $entorno     = $credenciales['entorno'];
-    $bd          = $credenciales['bd'];
-    $forzarHttps = (bool) ($credenciales['forzar_https'] ?? false);
-    $formatoViejo = false;
-} else {
-    // Formato anterior (bloques 'local' y 'hosting'): se sigue aceptando para no
-    // romper las copias de los compañeros, pero el entorno depende del Host.
-    // Migrar a config/credenciales.example.php cuanto antes.
-    $hostActual = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? 'localhost')[0]);
-    $entorno     = in_array($hostActual, ['localhost', '127.0.0.1', '::1'], true) ? 'local' : 'hosting';
-    $bd          = $credenciales[$entorno] ?? null;
-    $forzarHttps = false;
-    $formatoViejo = true;
-    if (!is_array($bd)) {
-        http_response_code(500);
-        exit('config/credenciales.php no tiene el bloque "' . $entorno . '".');
-    }
+// El propio archivo declara su entorno: lo decide el servidor, no la cabecera
+// Host que envía el navegador. (El formato viejo, con bloques 'local' y
+// 'hosting' elegidos según el Host, ya no se acepta: B4 de la revisión.)
+if (!is_array($credenciales)
+    || !in_array($credenciales['entorno'] ?? null, ['local', 'hosting'], true)
+    || !isset($credenciales['bd'])) {
+    http_response_code(500);
+    exit('config/credenciales.php debe tener el formato de config/credenciales.example.php '
+        . "('entorno' => 'local' | 'hosting' y el bloque 'bd').");
+}
+$bd          = $credenciales['bd'];
+$forzarHttps = (bool) ($credenciales['forzar_https'] ?? false);
+$dominio     = strtolower(trim((string) ($credenciales['dominio'] ?? '')));
+
+// Para redirigir a HTTPS hace falta el dominio fijo (B3): sin él, se tomaría de la petición
+if ($forzarHttps && preg_match('/^[a-z0-9.-]+(:\d+)?$/', $dominio) !== 1) {
+    http_response_code(500);
+    exit("config/credenciales.php: con 'forzar_https' => true hay que indicar 'dominio' (p. ej. 'coffeedesk.infinityfreeapp.com').");
 }
 
-define('ENTORNO', $entorno);
-define('CREDENCIALES_FORMATO_VIEJO', $formatoViejo);
+define('ENTORNO', $credenciales['entorno']);
 define('FORZAR_HTTPS', $forzarHttps);
+define('DOMINIO', $dominio);
 
 define('DB_HOST',   $bd['host']);
 define('DB_USER',   $bd['usuario']);
@@ -58,15 +52,11 @@ define('DB_NAME',   $bd['base']);
 define('DB_PORT',   (int) $bd['puerto']);
 define('BASE_URL',  rtrim($bd['base_url'], '/')); // para armar enlaces y redirecciones
 
-unset($credenciales, $bd, $entorno, $forzarHttps, $formatoViejo, $hostActual);
+unset($credenciales, $bd, $forzarHttps, $dominio);
 
 // ---- 3. Errores (F-005) ---------------------------------------------------
 require_once __DIR__ . '/../php/comun/errores.php';
 configurar_errores();
-
-if (CREDENCIALES_FORMATO_VIEJO && ENTORNO === 'local') {
-    error_log('[CoffeeDesk] config/credenciales.php usa el formato viejo; migrarlo a credenciales.example.php.');
-}
 
 /** Devuelve una URL absoluta dentro de la app: url('panel.php') */
 function url(string $ruta = ''): string

@@ -1,99 +1,46 @@
 <?php
 /**
- * Eliminación lógica de categorías.
- *
- * activo = 0
- *
- * No se eliminan físicamente los productos relacionados.
+ * Baja lógica de categorías (activo = 0), solo si no tienen productos activos.
+ * Con productos activos desaparecerían del menú y ya no se podrían editar:
+ * primero hay que moverlos a otra categoría o eliminarlos.
  *
  * Responsable: Gabo
  */
 
 require_once __DIR__ . '/../auth/sesion.php';
-require_once __DIR__ . '/../conexion.php';
+require_once __DIR__ . '/../dao/CategoriaDAO.php';
+require_once __DIR__ . '/../dao/ProductoDAO.php';
 
-// Seguridad
 requiere_rol(ROL_ADMIN);
+exigir_post_con_csrf('categorias.php');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-
-    mensaje_flash(
-        'error',
-        'La operación solicitada no es válida.'
-    );
-
-    redirigir('categorias.php');
+$id = post_id('id');
+if ($id === null) {
+    fallar('El identificador de la categoría no es válido.', 'categorias.php');
 }
 
-if (!csrf_valido(post_texto('csrf'))) {
+$categorias = new CategoriaDAO();
 
-    mensaje_flash(
-        'error',
-        'La solicitud no pudo verificarse.'
-    );
-
-    redirigir('categorias.php');
-}
-
-// ID
-
-$id = post_entero('id');
-
-if ($id === null || $id <= 0) {
-
-    mensaje_flash(
-        'error',
-        'El identificador de la categoría no es válido.'
-    );
-
-    redirigir('categorias.php');
-}
-
-// Buscar categoría
-
-$categoria = consultar_uno(
-    'SELECT id, nombre, activo
-     FROM categorias
-     WHERE id = ?
-     LIMIT 1',
-    [$id]
-);
-
+$categoria = $categorias->obtenerPorId($id);
 if ($categoria === null) {
-
-    mensaje_flash(
-        'error',
-        'La categoría no existe.'
-    );
-
-    redirigir('categorias.php');
+    fallar('La categoría no existe.', 'categorias.php');
 }
-
-// Ya eliminada
-
 if ((int) $categoria['activo'] === 0) {
-
-    mensaje_flash(
-        'aviso',
-        'La categoría ya se encuentra eliminada.'
-    );
-
-    redirigir('categorias.php');
+    terminar('aviso', 'La categoría ya se encuentra eliminada.', 'categorias.php');
 }
 
-// Eliminación lógica
+$productosActivos = (new ProductoDAO())->nombresActivosDeCategoria($id);
+if ($productosActivos) {
+    fallar(
+        'No se puede eliminar "' . $categoria['nombre'] . '" porque tiene ' . count($productosActivos)
+        . ' producto(s) activo(s): ' . implode(', ', $productosActivos)
+        . '. Muévelos a otra categoría o elimínalos primero.',
+        'categorias.php'
+    );
+}
 
-ejecutar(
-    'UPDATE categorias
-     SET activo = 0
-     WHERE id = ?
-       AND activo = 1',
-    [$id]
-);
+if (!$categorias->eliminarSiNoTieneProductos($id)) {
+    fallar('La categoría no pudo eliminarse porque cambió mientras tanto. Recarga e inténtalo de nuevo.', 'categorias.php');
+}
 
-mensaje_flash(
-    'exito',
-    'La categoría "' . $categoria['nombre'] . '" fue eliminada.'
-);
-
-redirigir('categorias.php');
+terminar('exito', 'La categoría "' . $categoria['nombre'] . '" fue eliminada.', 'categorias.php');

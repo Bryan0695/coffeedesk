@@ -12,10 +12,11 @@ Options -Indexes
 </IfModule>
 
 # Carpetas que solo se incluyen desde PHP o no deben publicarse
-RedirectMatch 403 ^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials|php/dao|php/models)/
+# (?i): XAMPP en Windows no distingue mayúsculas, /CONFIG/ abriría config/ (B2)
+RedirectMatch 403 (?i)^/?(.*/)?(config|sql|herramientas|docs|logs|tests|php/comun|php/partials|php/dao|php/models)/
 # php/auth/: todo es librería salvo los tres endpoints (login, logout, estado).
 # Un archivo nuevo en php/auth/ queda bloqueado hasta que se agregue aquí.
-RedirectMatch 403 ^/?(.*/)?php/auth/(?!(login|logout|estado)\.php$)[^/]*\.php$
+RedirectMatch 403 (?i)^/?(.*/)?php/auth/(?!(login|logout|estado)\.php$)[^/]*\.php$
 # Archivos y carpetas ocultos: .git/, .github/, .env, .htaccess, .gitignore…
 RedirectMatch 403 (?i)/\.(git|env|ht)
 # Documentación, scripts y logs sueltos (README.md, *.sql, *.sh, *.yml…)

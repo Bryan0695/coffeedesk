@@ -13,7 +13,7 @@ define('SESION_HORAS_MAXIMAS', 12);          // vida máxima aunque haya activid
 define('SESION_SEGUNDOS_REVALIDACION', 60);  // cada cuánto se revisa activo/rol en la BD (F-007)
 
 // ---- Límite de intentos de inicio de sesión (F-002) ----------------------
-define('LOGIN_MAX_INTENTOS', 5);       // por usuario
+define('LOGIN_MAX_INTENTOS', 5);       // por usuario desde una misma IP
 define('LOGIN_MAX_INTENTOS_IP', 20);   // por IP (una IP puede ser la wifi del local)
 define('LOGIN_MINUTOS_BLOQUEO', 5);    // ventana en la que se cuentan los intentos
 
@@ -34,7 +34,33 @@ define('PATRON_USUARIO', '[A-Za-z0-9._\-]{3,30}');
 // ---- Cabeceras de seguridad (F-006) --------------------------------------
 // 'enforce' aplica la CSP; 'report' solo avisa en la consola del navegador.
 define('CSP_MODO', 'enforce');
+// HSTS (solo con forzar_https = true): el navegador recuerda "solo HTTPS" durante
+// estos segundos y no hay forma de deshacerlo desde el servidor antes de que venza.
+// Se empieza con 300 (5 min) para poder volver atrás si el SSL del hosting falla.
+// Subirlo a 31536000 (1 año) cuando el sitio lleve unos días funcionando por
+// HTTPS sin bucles ni avisos de certificado (docs/despliegue_infinityfree.md §6).
+define('HSTS_SEGUNDOS', 300);
 
 // ---- Roles (deben coincidir con la tabla `roles`) ------------------------
 define('ROL_ADMIN',  'administrador');
 define('ROL_MESERO', 'mesero');
+
+// ---- Pedidos (la vista y el servidor leen los mismos límites) -----------
+define('PEDIDO_MAX_MESAS', 10);        // mesas del local: 1 … 10
+define('PEDIDO_MAX_CANTIDAD', 20);     // unidades de un mismo producto por pedido
+define('PEDIDO_MAX_LINEAS', 50);       // líneas que acepta un pedido
+define('PEDIDO_MAX_CLIENTE', 60);      // VARCHAR(60) de pedidos.cliente
+
+// Estados de un pedido (CHECK de la tabla pedidos)
+define('ESTADO_PENDIENTE', 'pendiente');
+define('ESTADO_ENTREGADO', 'entregado');
+define('ESTADO_ANULADO', 'anulado');
+
+// ---- Largos máximos de los nombres (columnas VARCHAR) --------------------
+define('NOMBRE_MAX_PRODUCTO', 80);
+define('NOMBRE_MAX_CATEGORIA', 60);
+define('NOMBRE_MAX_INSUMO', 80);
+
+// ---- Inventario ------------------------------------------------------------
+// Deben coincidir con el CHECK chk_insumos_unidad de la tabla insumos
+define('UNIDADES_INSUMO', ['unidades', 'kg', 'g', 'litros', 'ml']);

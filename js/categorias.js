@@ -1,80 +1,34 @@
-'use strict';
+/**
+ * Categorías: búsqueda por nombre (sin distinguir tildes) y modo edición del formulario.
+ * Requiere js/comun.js. Va dentro de una función para no crear variables globales.
+ */
+(() => {
+    'use strict';
 
-// Mantenimiento de categorías
+    const tablaCategorias = document.getElementById('tabla-categorias');
+    const campoBuscar = document.getElementById('buscar');
+    const formCategoria = document.getElementById('form-categoria');
 
-const formCategoria = document.getElementById('form-categoria');
+    // Sin categorías la página no muestra la tabla ni el buscador
+    if (tablaCategorias && campoBuscar) {
+        const aplicarFiltros = () => {
+            const texto = normalizar(campoBuscar.value.trim());
+            filtrarTabla(tablaCategorias, (fila) => normalizar(fila.dataset.nombre).includes(texto));
+        };
+        campoBuscar.addEventListener('input', aplicarFiltros);
+        document.getElementById('form-filtros').addEventListener('submit', (e) => e.preventDefault());
+        aplicarFiltros();
+    }
 
-if (formCategoria) {
-
-    const categoriaId       = document.getElementById('categoria-id');
-    const categoriaNombre   = document.getElementById('categoria-nombre');
-    const tituloFormulario  = document.getElementById('titulo-form-categoria');
-    const botonGuardar      = document.getElementById('boton-guardar-categoria');
-    const botonCancelar     = document.getElementById('cancelar-edicion-categoria');
-
-    
-    // Editar
-
-    document.querySelectorAll('[data-editar-categoria]').forEach((boton) => {
-
-            boton.addEventListener('click', () => {
-                categoriaId.value               = boton.dataset.id;
-                categoriaNombre.value           = boton.dataset.nombre;
-                tituloFormulario.textContent    = 'Editar categoría';
-                botonGuardar.textContent        = 'Guardar cambios';
-                botonCancelar.hidden            = false;
-                categoriaNombre.focus();
-            });
-
+    if (formCategoria) {
+        modoEdicion({
+            form: formCategoria,
+            titulo: document.getElementById('titulo-form-categoria'),
+            textoAgregar: 'Agregar categoría',
+            textoEditar: 'Editar categoría',
+            rellenar: (datos) => {
+                formCategoria.elements.nombre.value = datos.nombre;
+            },
         });
-
-    
-    // Cancelar edición
-    botonCancelar.addEventListener('click', () => {
-
-        formCategoria.reset();
-
-        categoriaId.value            = '';
-        tituloFormulario.textContent = 'Agregar categoría';
-        botonGuardar.textContent     = 'Guardar categoría';
-        botonCancelar.hidden         = true;
-
-        categoriaNombre.focus();
-    });
-}
-
-// -----------------------------------------------------------------------------
-// Buscador de categorías
-// -----------------------------------------------------------------------------
-
-const buscarCategoria           = document.getElementById('buscar-categoria');
-const filasCategorias           = document.querySelectorAll('[data-fila-categoria]');
-const sinResultadosCategorias   = document.getElementById('sin-resultados-categorias');
-
-if (buscarCategoria) {
-
-    buscarCategoria.addEventListener('input', () => {
-
-        const textoBusqueda = buscarCategoria.value.trim().toLocaleLowerCase('es');
-
-        let visibles = 0;
-
-        filasCategorias.forEach((fila) => {
-
-            const nombre = fila.dataset.nombre ?? '';
-
-            const coincide = nombre.includes(textoBusqueda);
-
-            fila.hidden = !coincide;
-
-            if (coincide) {
-                visibles++;
-            }
-        });
-
-        if (sinResultadosCategorias) {
-            sinResultadosCategorias.hidden = 
-            visibles !== 0;
-        }
-    });
-}
+    }
+})();

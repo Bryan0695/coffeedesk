@@ -1,283 +1,123 @@
 <?php
-
 /**
- * Mantenimiento de categorías.
+ * Categorías del menú (solo administrador): búsqueda, alta, edición,
+ * eliminación lógica y reactivación.
  *
- * Funciones:
- * - listar categorías activas e inactivas;
- * - crear categorías;
- * - editar categorías;
- * - eliminación lógica;
- * - reactivación mediante categoria_guardar.php.
- *
- * Responsable: Gabo
+ * Vista y lógica: Gabo (php/menu/categoria_*.php, php/dao/CategoriaDAO.php).
  */
-
 require_once __DIR__ . '/php/auth/sesion.php';
-require_once __DIR__ . '/php/conexion.php';
+require_once __DIR__ . '/php/dao/CategoriaDAO.php';
 
 requiere_rol(ROL_ADMIN);
 
-// Consultar categorías
-
-$categorias = consultar(
-    'SELECT id, nombre, activo
-     FROM categorias
-     ORDER BY activo DESC, nombre ASC'
-);
-
-// Configuración de página
+$categorias = (new CategoriaDAO())->listarTodas();
 
 $tituloPagina = 'Categorías';
 $scripts = ['js/comun.js', 'js/categorias.js'];
-
 require __DIR__ . '/php/partials/cabecera.php';
 ?>
-
-<h1>Categorías</h1>
-
-<p class="texto-suave">
-    Administra las categorías utilizadas por los productos del menú.
-</p>
-
-<?php if (es_admin()): ?>
-    <a class="boton-secundario" href="<?= e(url('menu.php')) ?>">
-    <?= icono('editar') ?> Menú </a>
-<?php endif; ?>
-
-<div class="disposicion">
-
-    <!-- Listado de Categorias -->
-    <section
-        class="tarjeta"
-        aria-labelledby="titulo-listado-categorias">
-
-        <div class="tarjeta-cabecera">
-
+        <div class="encabezado-pagina">
             <div>
-                <h2 id="titulo-listado-categorias">
-                    Categorías registradas
-                </h2>
-
-                <p class="texto-suave">
-                    Consulta, modifica o elimina categorías del menú.
-                </p>
+                <h1>Categorías</h1>
+                <p class="descripcion">Organiza las categorías en las que se agrupan los productos del menú.</p>
             </div>
-
+            <div class="acciones-encabezado">
+                <a class="boton-secundario" href="<?= e(url('menu.php')) ?>"><?= icono('menu') ?> Volver al menú</a>
+                <a class="boton-primario" href="#form-categoria"><?= icono('mas') ?> Nueva categoría</a>
+            </div>
         </div>
 
-        <div class="barra-herramientas">
+        <div class="disposicion">
+            <section class="tarjeta" aria-labelledby="titulo-categorias">
+                <div class="tarjeta-cabecera">
+                    <h2 id="titulo-categorias">Categorías registradas</h2>
+                    <p id="resultado-filtro" class="resultado-filtro" aria-live="polite"></p>
+                </div>
 
-            <div class="campo campo-busqueda">
+                <?php if ($categorias === []): ?>
+                    <p class="estado-vacio">Todavía no hay categorías registradas.</p>
+                <?php else: ?>
+                    <form class="filtros" role="search" aria-label="Buscar categorías" id="form-filtros">
+                        <div class="campo campo-busqueda">
+                            <label for="buscar">Buscar por nombre</label>
+                            <?= icono('buscar') ?>
+                            <input type="search" id="buscar" name="q" autocomplete="off" placeholder="Ej.: bebidas">
+                        </div>
+                    </form>
 
-                <label for="buscar-categoria"> Buscar categoría </label>
-                <?= icono('buscar') ?>
-                <input type="search" id="buscar-categoria" placeholder="Ej. Bebidas calientes" autocomplete="off" >
+                    <div class="tabla-envoltura" role="region" aria-labelledby="titulo-categorias" tabindex="0">
+                        <table id="tabla-categorias">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Categoría</th>
+                                    <th scope="col">Estado</th>
+                                    <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($categorias as $c): ?>
+                                    <?php $activa = (int) $c['activo'] === 1; ?>
+                                    <tr data-nombre="<?= e($c['nombre']) ?>">
+                                        <th scope="row"><?= e($c['nombre']) ?></th>
+                                        <td>
+                                            <?php if ($activa): ?>
+                                                <span class="insignia insignia-ok">Activa</span>
+                                            <?php else: ?>
+                                                <span class="insignia insignia-info">Eliminada</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div class="acciones-tabla">
+                                                <?php if ($activa): ?>
+                                                    <button type="button" class="boton-fantasma" data-editar title="Editar"
+                                                            data-id="<?= (int) $c['id'] ?>"
+                                                            data-nombre="<?= e($c['nombre']) ?>"
+                                                            aria-label="Editar <?= e($c['nombre']) ?>"><?= icono('editar') ?></button>
+                                                    <form action="<?= e(url('php/menu/categoria_eliminar.php')) ?>" method="post"
+                                                          data-confirmar="¿Eliminar la categoría «<?= e($c['nombre']) ?>»?">
+                                                        <?= csrf_campo() ?>
+                                                        <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
+                                                        <button type="submit" class="boton-fantasma boton-fantasma-peligro" title="Eliminar"
+                                                                aria-label="Eliminar <?= e($c['nombre']) ?>"><?= icono('eliminar') ?></button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <form action="<?= e(url('php/menu/categoria_reactivar.php')) ?>" method="post"
+                                                          data-confirmar="¿Reactivar la categoría «<?= e($c['nombre']) ?>»?">
+                                                        <?= csrf_campo() ?>
+                                                        <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
+                                                        <button type="submit" class="boton-fantasma" title="Reactivar"
+                                                                aria-label="Reactivar <?= e($c['nombre']) ?>"><?= icono('ok') ?></button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p id="sin-resultados" class="estado-vacio" hidden>Ninguna categoría coincide con la búsqueda.</p>
+                <?php endif; ?>
+            </section>
 
-            </div>
+            <section class="tarjeta tarjeta-lateral" aria-labelledby="titulo-form-categoria">
+                <h2 id="titulo-form-categoria">Agregar categoría</h2>
+                <form id="form-categoria" action="<?= e(url('php/menu/categoria_guardar.php')) ?>" method="post" novalidate data-validar>
+                    <?= csrf_campo() ?>
+                    <input type="hidden" id="categoria-id" name="id" value="">
 
+                    <div class="campo">
+                        <label for="categoria-nombre">Nombre</label>
+                        <input type="text" id="categoria-nombre" name="nombre" required maxlength="<?= NOMBRE_MAX_CATEGORIA ?>"
+                               autocomplete="off" aria-describedby="error-categoria-nombre">
+                        <p class="error-campo" id="error-categoria-nombre" aria-live="polite"></p>
+                    </div>
+
+                    <div class="acciones-form">
+                        <button type="submit" class="boton-primario" id="boton-guardar">Guardar categoría</button>
+                        <button type="button" class="boton-secundario" id="cancelar-edicion" hidden>Cancelar</button>
+                    </div>
+                </form>
+            </section>
         </div>
-
-        <div
-            class="tabla-envoltura"
-            role="region"
-            aria-labelledby="titulo-listado-categorias"
-            tabindex="0">
-
-            <table>
-
-                <thead>
-                    <tr>
-                        <th scope="col"> Categoría </th>
-                        <th scope="col"> Estado </th>
-
-                        <th scope="col"> 
-                            <span class="visualmente-oculto"> Acciones </span>
-                        </th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    <?php if ($categorias === []): ?>
-
-                        <tr>
-                            <td colspan="3">
-                                No existen categorías registradas.
-                            </td>
-                        </tr>
-
-                    <?php else: ?>
-
-                        <?php foreach ($categorias as $categoria): ?>
-
-                            <!-- <tr> -->
-                            <tr data-fila-categoria data-nombre="<?= e(mb_strtolower($categoria['nombre'])) ?>">
-
-                                <!-- Nombre -->
-                                <th scope="row">
-                                    <?= e($categoria['nombre']) ?>
-                                </th>
-
-                                <!-- Estado -->
-                                <td>
-
-                                    <?php if ((int) $categoria['activo'] === 1): ?>
-
-                                        <span class="insignia insignia-ok">
-                                            Activa
-                                        </span>
-
-                                    <?php else: ?>
-
-                                        <span class="insignia insignia-info">
-                                            Eliminada
-                                        </span>
-
-                                    <?php endif; ?>
-
-                                </td>
-
-                                <!-- Acciones -->
-                                <td>
-
-                                    <?php if ((int) $categoria['activo'] === 1): ?>
-
-                                        <div class="acciones-tabla">
-
-                                            <!-- Editar -->
-                                            <button
-                                                type="button"
-                                                class="boton-icono boton-fantasma"
-                                                data-editar-categoria
-                                                data-id="<?= (int) $categoria['id'] ?>"
-                                                data-nombre="<?= e($categoria['nombre']) ?>"
-                                                title="Editar categoría"
-                                                aria-label="Editar categoría <?= e($categoria['nombre']) ?>">
-                                                <?= icono('editar') ?>
-                                            </button>
-
-                                            <!-- Eliminar lógico -->
-                                            <form
-                                                action="<?= e(url('php/menu/categoria_eliminar.php')) ?>"
-                                                method="post"
-                                                data-confirmar="¿Eliminar la categoría «<?= e($categoria['nombre']) ?>»?">
-
-                                                <?= csrf_campo() ?>
-
-                                                <input
-                                                    type="hidden"
-                                                    name="id"
-                                                    value="<?= (int) $categoria['id'] ?>">
-
-                                                <button
-                                                    type="submit"
-                                                    class="boton-icono boton-fantasma-peligro"
-                                                    title="Eliminar categoría"
-                                                    aria-label="Eliminar categoría <?= e($categoria['nombre']) ?>">
-                                                    <?= icono('eliminar') ?>
-                                                </button>
-
-                                            </form>
-
-                                        </div>
-
-                                    <?php else: ?>
-                                        <!-- Reactivación de categoria -->
-                                        <div class="acciones-tabla">
-
-                                            <form action="<?= e(url('php/menu/categoria_reactivar.php')) ?>"
-                                                method="post" 
-                                                data-confirmar="¿Reactivar la categoría «<?= e($categoria['nombre']) ?>»?">
-                                                <?= csrf_campo() ?>
-
-                                                <input type="hidden" name="id" value="<?= (int) $categoria['id'] ?>" >
-
-                                                <button
-                                                    type="submit"
-                                                    class="boton-icono boton-fantasma"
-                                                    title="Reactivar categoría"
-                                                    aria-label="Reactivar categoría <?= e($categoria['nombre']) ?>">
-                                                    <?= icono('ok') ?>
-                                                </button>
-
-                                            </form>
-                                        </div>
-
-                                    <?php endif; ?>
-
-                                </td>
-                            </tr>
-
-                        <?php endforeach; ?>
-
-                    <?php endif; ?>
-
-                </tbody>
-
-                <tr id="sin-resultados-categorias" hidden >
-                    <td colspan="3">
-                        No se encontraron categorías que coincidan con la búsqueda.
-                    </td>
-                </tr>
-
-            </table>
-        </div>
-    </section>
-
-
-    <!-- Formulario / Mantenimiento -->
-
-    <section
-        class="tarjeta tarjeta-lateral"
-        aria-labelledby="titulo-form-categoria">
-
-        <div class="tarjeta-cabecera">
-
-            <div>
-                <h2 id="titulo-form-categoria">
-                    Agregar categoría
-                </h2>
-
-                <p class="texto-suave">
-                    Registra una nueva categoría o modifica una existente.
-                </p>
-            </div>
-
-        </div>
-
-        <form id="form-categoria" action="<?= e(url('php/menu/categoria_guardar.php')) ?>"
-            method="post" novalidate data-validar>
-
-            <?= csrf_campo() ?>
-
-            <!-- ID vacío = crear / con valor = editar -->
-            <input type="hidden" id="categoria-id" name="id" value="">
-
-            <div class="campo">
-
-                <label for="categoria-nombre"> Nombre </label>
-
-                <input type="text" id="categoria-nombre" name="nombre" maxlength="60"
-                    required autocomplete="off" aria-describedby="error-categoria-nombre">
-
-                <p class="error-campo" id="error-categoria-nombre" aria-live="polite"></p>
-
-            </div>
-
-            <div class="acciones-form">
-
-                <button type="submit" class="boton-primario" id="boton-guardar-categoria">
-                    Guardar categoría
-                </button>
-
-                <button type="button" class="boton-secundario" id="cancelar-edicion-categoria" hidden>
-                    Cancelar
-                </button>
-
-            </div>
-        </form>
-    </section>
-</div>
-
 <?php require __DIR__ . '/php/partials/pie.php'; ?>

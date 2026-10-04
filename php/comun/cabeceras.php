@@ -27,8 +27,10 @@ function enviar_cabeceras_seguridad(): void
 
     // Solo si credenciales.php lo pide: detrás del proxy de InfinityFree
     // $_SERVER['HTTPS'] puede no llegar y se formaría un bucle de redirecciones.
+    // El dominio sale de credenciales.php, no de la cabecera Host que envía el
+    // cliente: así la redirección nunca apunta a otro sitio (B3).
     if (FORZAR_HTTPS && !es_https()) {
-        header('Location: https://' . ($_SERVER['HTTP_HOST'] ?? '') . ($_SERVER['REQUEST_URI'] ?? '/'), true, 301);
+        header('Location: https://' . DOMINIO . ($_SERVER['REQUEST_URI'] ?? '/'), true, 301);
         exit;
     }
 
@@ -42,12 +44,8 @@ function enviar_cabeceras_seguridad(): void
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: same-origin');
 
-    // HSTS: el navegador recuerda "solo HTTPS" durante max-age segundos y no
-    // hay forma de deshacerlo desde el servidor antes de que venza. Se empieza
-    // con 300 (5 min) para poder volver atrás si el SSL del hosting falla.
-    // Subirlo a 31536000 (1 año) cuando el sitio lleve unos días funcionando
-    // por HTTPS con forzar_https = true sin bucles ni avisos de certificado.
+    // HSTS: ver HSTS_SEGUNDOS en config/constantes.php antes de subirlo
     if (FORZAR_HTTPS && es_https()) {
-        header('Strict-Transport-Security: max-age=300');
+        header('Strict-Transport-Security: max-age=' . HSTS_SEGUNDOS);
     }
 }

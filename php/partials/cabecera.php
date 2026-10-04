@@ -22,8 +22,13 @@ $enlaces = [
     ['panel.php',      'Inicio',     'inicio',     [ROL_ADMIN, ROL_MESERO]],
     ['pedidos.php',    'Pedidos',    'pedidos',    [ROL_ADMIN, ROL_MESERO]],
     ['menu.php',       'Menú',       'menu',       [ROL_ADMIN, ROL_MESERO]],
+    ['categorias.php', 'Categorías', 'categorias', [ROL_ADMIN]],
     ['inventario.php', 'Inventario', 'inventario', [ROL_ADMIN]],
 ];
+
+// Páginas sin enlace propio que marcan como actual la sección a la que pertenecen
+$seccionDe = ['recetas.php' => 'menu.php'];
+$paginaActual = $seccionDe[$paginaActual] ?? $paginaActual;
 
 require __DIR__ . '/head.php';
 ?>

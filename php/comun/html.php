@@ -9,10 +9,12 @@ function e(?string $texto): string
     return htmlspecialchars($texto ?? '', ENT_QUOTES, 'UTF-8');
 }
 
-/** Formatea un importe en centavos como dólares: 350 → "$3.50". */
+/** Formatea un importe en centavos como dólares: 350 → "$3.50", 123456 → "$1,234.56", -50 → "-$0.50". */
 function dinero(int $centavos): string
 {
-    return '$' . number_format($centavos / 100, 2, '.', ',');
+    $signo = $centavos < 0 ? '-' : '';
+    $centavos = abs($centavos);
+    return $signo . '$' . number_format(intdiv($centavos, 100), 0, '.', ',') . sprintf('.%02d', $centavos % 100);
 }
 
 /**
@@ -35,6 +37,8 @@ function icono(string $nombre): string
         'alerta'     => '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
         'flecha'     => '<path d="M5 12h14M13 5l7 7-7 7"/>',
         'ok'         => '<path d="M20 6 9 17l-5-5"/>',
+        'categorias' => '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+        'receta'     => '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/><path d="M7.5 15h9"/>',
     ];
     return '<svg class="icono" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'
          . ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
@@ -45,4 +49,15 @@ function icono(string $nombre): string
 function cantidad(string $valor): string
 {
     return str_contains($valor, '.') ? rtrim(rtrim($valor, '0'), '.') : $valor;
+}
+
+/** Insignia accesible (texto + color) con el estado de un pedido. */
+function insignia_estado_pedido(string $estado): string
+{
+    [$clase, $texto] = match ($estado) {
+        ESTADO_ENTREGADO => ['insignia-ok', 'Entregado'],
+        ESTADO_ANULADO   => ['insignia-error', 'Anulado'],
+        default          => ['insignia-info', 'Pendiente'],
+    };
+    return '<span class="insignia ' . $clase . '">' . $texto . '</span>';
 }

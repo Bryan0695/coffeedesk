@@ -435,6 +435,7 @@ a:hover { color: var(--marca-hover); }
     gap: 1rem;
     margin-bottom: 1.75rem;
 }
+.acciones-encabezado { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .sobretitulo { margin: 0 0 0.25rem; font-size: 0.875rem; font-weight: 600; color: var(--marca); }
 .descripcion { margin: 0.375rem 0 0; color: var(--texto-suave); }
 
@@ -614,6 +615,7 @@ tbody tr:hover { background: var(--superficie-suave); }
     white-space: nowrap;
 }
 .insignia .icono { width: 14px; height: 14px; }
+.insignia + .insignia { margin-left: 0.25rem; }
 .insignia-ok    { background: var(--exito-fondo); color: var(--exito-texto); }
 .insignia-error { background: var(--error-fondo); color: var(--error-texto); }
 .insignia-aviso { background: var(--aviso-fondo); color: var(--aviso-texto); }
@@ -762,6 +764,8 @@ tbody tr:hover { background: var(--superficie-suave); }
 @media (max-width: 560px) {
     h1 { font-size: 1.5rem; }
     .encabezado-pagina > .boton-primario { width: 100%; }
+    .acciones-encabezado { width: 100%; }
+    .acciones-encabezado > * { flex: 1; }
     .tarjeta { padding: 1rem; border-radius: var(--radio); }
     .tabla-envoltura { margin: 0 -1rem; }
     th, td { padding: 0.625rem 1rem; }

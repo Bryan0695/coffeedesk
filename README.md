@@ -26,9 +26,11 @@ coffeedesk/
 ├── panel.php              ← inicio después del login
 ├── pedidos.php            ← (Gabo)
 ├── menu.php               ← (Gabo)
+├── recetas.php            ← insumos que descuenta cada producto (solo administrador)
+├── categorias.php         ← solo administrador
 ├── inventario.php         ← (Jeremy) solo administrador
 ├── css/estilos.css        ← estilos (Frederick)
-├── js/login.js            ← validación del login en el cliente
+├── js/                    ← login.js, comun.js (validación, filtros, modo edición) y uno por módulo
 ├── config/
 │   ├── config.php                         ← carga credenciales, entorno y errores
 │   ├── constantes.php                     ← roles, límites, PATRON_USUARIO, CSP…
@@ -43,20 +45,29 @@ coffeedesk/
 │   │   ├── logout.php     ← cierra sesión (POST)
 │   │   ├── estado.php     ← usuario actual en JSON (GET)
 │   │   ├── autorizacion.php, csrf.php, arranque_sesion.php, limite_intentos.php
-│   ├── comun/             ← html.php (e), respuesta.php, flash.php, validacion.php,
-│   │                        cabeceras.php, errores.php
+│   ├── comun/             ← html.php (e), dinero.php, respuesta.php, flash.php,
+│   │                        validacion.php, cabeceras.php, errores.php
+│   ├── dao/               ← TODO el SQL de los módulos: una clase por tabla
+│   │                        (ProductoDAO, CategoriaDAO, PedidoDAO, RecetaDAO, InventarioDAO)
+│   ├── models/            ← Insumo.php
+│   ├── menu/, pedidos/, inventario/   ← endpoints POST: validan y llaman al DAO
 │   └── partials/          ← head.php, cabecera.php, pie.php, pie_pagina.php
 ├── sql/
 │   ├── 00_crear_bd_local.sql      ← solo XAMPP
 │   ├── 01_usuarios_roles.sql      ← versión 1: esquema_version, roles, usuarios
 │   ├── 02_intentos_login.sql      ← versión 2: límite de intentos de login
-│   └── 90_seed_solo_local.sql     ← usuarios de prueba (¡NUNCA en el hosting!)
+│   ├── 03_menu.sql … 07_productos_activo.sql  ← menú, pedidos, inventario y recetas
+│   ├── 08_pedido_insumo.sql       ← versión 8: lo que descontó cada pedido (para anularlo)
+│   ├── 90_seed_solo_local.sql     ← usuarios de prueba (¡NUNCA en el hosting!)
+│   └── 91_seed_catalogo_solo_local.sql  ← catálogo de prueba (solo local)
 ├── herramientas/
 │   ├── generar_hash.php   ← hash de una contraseña
 │   └── crear_admin.php    ← genera el INSERT del admin del hosting
 ├── tests/
 │   ├── verificar_endpoints.php    ← todo endpoint llama a requiere_*()
-│   └── integracion.sh             ← pruebas con curl
+│   ├── dinero.php                 ← conversión de importes (consola)
+│   ├── modulos.sh                 ← categorías, menú, inventario, recetas y pedidos (curl)
+│   └── integracion.sh             ← login, roles, cabeceras y .htaccess (curl)
 ├── logs/                  ← php_error.log (no va a Git; bloqueado por .htaccess)
 ├── docs/                  ← despliegue, plan de pruebas, auditorías
 ├── .github/workflows/ci.yml
@@ -83,7 +94,9 @@ Los archivos de Gabo y Jeremy (CRUD) van en `php/menu/`, `php/pedidos/` y `php/i
 
 **¿Ya tenías la base de antes de la auditoría?** Solo tenía datos de prueba: bórrala (`DROP DATABASE coffeedesk;`) y repite el paso 4. El 01 nuevo falla a propósito si las tablas ya existen.
 
-**¿Tu `credenciales.php` es del formato viejo** (bloques `local` y `hosting`)? Sigue funcionando, pero migra al formato de `credenciales.example.php`: con el viejo, abrir la app desde el móvil por la IP de la LAN carga las credenciales del hosting.
+**¿Tu `credenciales.php` es del formato viejo** (bloques `local` y `hosting`)? Ya no se acepta (elegía el entorno según la cabecera Host): cópialo de nuevo desde `credenciales.example.php`.
+
+**¿Tu base es anterior al 08?** Importa `sql/08_pedido_insumo.sql` (también en el hosting) **a la vez que actualizas el código**, sin registrar pedidos entre una cosa y la otra: el código nuevo sin la tabla da error al registrar o anular, y los pedidos que registre el código viejo con la tabla ya creada no devolverían stock al anularse.
 
 **Usuarios de prueba (solo locales)**
 
@@ -92,7 +105,7 @@ Los archivos de Gabo y Jeremy (CRUD) van en `php/menu/`, `php/pedidos/` y `php/i
 | `admin` | `Admin123*` | administrador |
 | `mesero` | `Mesero123*` | mesero |
 
-Estas contraseñas son **públicas** (están en este README). Existen solo si importas `90_seed_solo_local.sql`, que **nunca** se importa en el hosting. El administrador del hosting se crea con `herramientas/crear_admin.php` (ver [despliegue](docs/despliegue_infinityfree.md)).
+Estas contraseñas son **públicas** (están en este README). Existen solo si importas `90_seed_solo_local.sql`, que **nunca** se importa en el hosting. Ojo: Apache de XAMPP escucha en todas las interfaces, así que cualquiera en tu misma red puede entrar como `admin` mientras XAMPP esté abierto. En redes que no sean la de tu casa, cambia en `C:\xampp\apache\conf\httpd.conf` la línea `Listen 80` por `Listen 127.0.0.1:80`. El administrador del hosting se crea con `herramientas/crear_admin.php` (ver [despliegue](docs/despliegue_infinityfree.md)).
 
 Para crear otra contraseña cifrada:
 ```bash
@@ -131,7 +144,7 @@ requiere_rol(ROL_ADMIN);              // solo administrador
 requiere_rol(ROL_ADMIN, ROL_MESERO);  // ambos
 ```
 
-Archivos que responden JSON (según los contratos de Jeremy):
+Archivos que responden JSON:
 
 ```php
 requiere_rol_api(ROL_ADMIN);   // responde 401/403 en JSON si no cumple
@@ -151,17 +164,19 @@ No uses `$_POST['x']` directamente: un atacante puede enviar `x[]=…` y provoca
 ```php
 $nombre   = trim(post_texto('nombre'));   // '' si falta o no es texto
 $cantidad = post_entero('cantidad');      // int, o null si falta o no es un entero
-$busqueda = trim(get_texto('q'));         // equivalentes para la URL
-$pagina   = get_entero('pagina') ?? 1;
+$id       = post_id('id');                // int > 0, o null
+$producto = get_id('producto');           // lo mismo para la URL (?producto=5)
 
 if ($cantidad === null || $cantidad <= 0) {
-    responder_json('error', 'La cantidad debe ser un entero mayor que 0.', null, 422);
+    fallar('La cantidad debe ser un entero mayor que 0.', 'pedidos.php');   // mensaje + redirección
 }
 ```
 
+Otras validaciones comunes (`php/comun/validacion.php` y `dinero.php`): `cantidad_valida()` (stock con hasta 3 decimales), `largo_valido()`, `texto_a_centavos()` (precio escrito por el usuario). Los límites (mesas, cantidades, largo de los nombres, estados, unidades) están en `config/constantes.php`: la vista y el servidor leen la misma constante.
+
 ### 4.3 Consultar la base de datos
 
-Todas las consultas son preparadas. **Nunca** concatenes variables en el SQL.
+El SQL de los módulos va en **`php/dao/`**, una clase por tabla; las páginas y los endpoints solo llaman a sus métodos (`(new ProductoDAO())->listarActivos()`). Todas las consultas son preparadas. **Nunca** concatenes variables en el SQL.
 
 ```php
 $productos = consultar(
@@ -194,12 +209,12 @@ $idPedido = transaccion(function () use ($mesa, $lineas) {
 });
 ```
 
-Para dinero usa `DECIMAL(10,2)` en MySQL y opera en centavos enteros en PHP; no sumes `float`.
+Para dinero usa `DECIMAL(10,2)` en MySQL y opera en centavos enteros en PHP con `php/comun/dinero.php`: `precio_a_centavos('2.50')` → 250 y `centavos_a_decimal(250)` → `'2.50'`. No uses `float` ni `round($x * 100)`.
 
 ### 4.4 Formularios, mensajes y vistas
 
-- Formularios POST: incluir `<?= csrf_campo() ?>` dentro del `<form>` y validar con `csrf_valido(post_texto('csrf'))`.
-- Mensajes después de redirigir: `mensaje_flash('exito', 'Guardado.')`; la cabecera ya los imprime con `mostrar_flash()`.
+- Formularios POST: incluir `<?= csrf_campo() ?>` dentro del `<form>`; el endpoint empieza con `exigir_post_con_csrf('pagina.php')` (rechaza GET y tokens inválidos con el mismo mensaje en todos los módulos).
+- Mensajes después de redirigir: `terminar('exito', 'Guardado.', 'menu.php')` o, para errores, `fallar('…', 'menu.php')` (guardan el mensaje y redirigen); la cabecera ya los imprime con `mostrar_flash()`.
 - Imprimir datos del usuario o de la BD en HTML: siempre con `e($texto)`.
 - Usuario conectado: `usuario_actual()['id']` (útil para guardar quién registró un pedido).
 - Página interna: definir `$tituloPagina`, incluir `php/partials/cabecera.php` y cerrar con `php/partials/pie.php`. Para cargar JS propio: `$scripts = ['js/pedidos.js'];` antes de incluir `pie.php`.
@@ -241,14 +256,17 @@ Para dinero usa `DECIMAL(10,2)` en MySQL y opera en centavos enteros en PHP; no 
 - Consultas preparadas en todo acceso a la base (helpers `consultar`, `ejecutar`…).
 - Validación en cliente (`js/login.js`) **y** en servidor, con la misma regla (`PATRON_USUARIO`).
 - `session_regenerate_id()` al iniciar y al cerrar sesión; modo estricto de sesión.
-- Cookie de sesión `HttpOnly`, `SameSite=Lax` y `Secure` con HTTPS.
+- Cookie de sesión `HttpOnly`, `SameSite=Lax` y `Secure` con HTTPS (en el hosting, activa `forzar_https` en cuanto funcione el SSL: mientras esté en `false` la cookie viaja sin cifrar).
+- La redirección a HTTPS usa el `dominio` de `credenciales.php`, no la cabecera `Host`.
 - Cierre tras 30 min de inactividad, vida máxima de 12 h, y revisión cada minuto de que la cuenta siga activa y con el mismo rol.
-- Bloqueo de 5 min tras 5 intentos fallidos por usuario o 20 por IP, guardado en la base (no se evita borrando la cookie).
+- Bloqueo de 5 min tras 5 intentos fallidos de un usuario desde una misma IP o 20 desde una IP, guardado en la base (no se evita borrando la cookie). Fallar desde otro equipo no bloquea la cuenta del administrador, y los intentos simultáneos desde una misma IP se atienden de uno en uno (`GET_LOCK`), así que no se puede rebasar el límite con peticiones en paralelo.
 - Mismo tiempo de respuesta exista o no el usuario, y mensaje genérico.
 - Token CSRF en todos los formularios POST, renovado al iniciar sesión.
 - Cabeceras CSP, `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`.
 - Errores visibles solo en local; en el hosting se registran en `logs/php_error.log` con un código de referencia.
-- `.htaccess` bloquea `config/`, `sql/`, `logs/`, `docs/`, `.git`, `*.md`, `*.sql`…
+- `.htaccess` bloquea `config/`, `sql/`, `logs/`, `docs/`, `.git`, `*.md`, `*.sql`… sin distinguir mayúsculas (`/CONFIG/` también da 403 en Windows).
+- Al anular un pedido se devuelve exactamente el stock que se descontó (tabla `pedido_insumo`), aunque la receta haya cambiado.
+- Los productos de un pedido se vuelven a comprobar dentro de la transacción (`FOR UPDATE`): uno marcado como agotado al mismo tiempo no se vende.
 
 ---
 
@@ -258,13 +276,18 @@ Para dinero usa `DECIMAL(10,2)` en MySQL y opera en centavos enteros en PHP; no 
 # Sintaxis con el PHP de XAMPP (8.0)
 for f in $(git ls-files '*.php'); do C:/xampp/php/php.exe -l "$f" || break; done
 
-# Todo endpoint protegido
+# Todo endpoint protegido y conversión de importes
 C:\xampp\php\php.exe tests\verificar_endpoints.php
+C:\xampp\php\php.exe tests\dinero.php
 
-# Integración (Git Bash), con Apache de XAMPP y la base que uses:
-MYSQL_CMD="/c/xampp/mysql/bin/mysql.exe -uroot coffeedesk" CON_APACHE=1 \
-  bash tests/integracion.sh http://localhost/coffeedesk
+# Módulos e integración (Git Bash), con Apache de XAMPP y una base de PRUEBA
+# (modulos.sh crea categorías, productos, insumos y pedidos con nombres únicos):
+export MYSQL_CMD="/c/xampp/mysql/bin/mysql.exe -uroot coffeedesk_prueba"
+bash tests/modulos.sh http://localhost/coffeedesk
+CON_APACHE=1 bash tests/integracion.sh http://localhost/coffeedesk
 ```
+
+`modulos.sh` prueba la protección de los 11 endpoints, el CRUD de categorías, productos, insumos y recetas, y que los pedidos descuenten el stock, lo devuelvan al anularse (aunque la receta haya cambiado) y fallen sin tocar nada cuando no alcanza.
 
 `integracion.sh` necesita los usuarios de `90_seed_solo_local.sql`. Con `MYSQL_CMD` vacía la tabla `intentos_login` al empezar y al terminar; sin él, repetirlo antes de 5 minutos da falsos fallos (la propia prueba deja bloqueado al mesero). El plan manual está en [`docs/plan_pruebas.md`](docs/plan_pruebas.md).
 

@@ -1,189 +1,67 @@
 <?php
 /**
- * Cambio de estado de pedidos.
- *
- * Estados permitidos:
- * pendiente -> entregado
- * pendiente -> anulado
+ * Cambio de estado de pedidos. Solo se procesan pedidos pendientes:
+ *   pendiente → entregado   (administrador o mesero)
+ *   pendiente → anulado     (solo administrador; devuelve el stock descontado)
  *
  * Responsable: Gabo
  */
 
 require_once __DIR__ . '/../auth/sesion.php';
-require_once __DIR__ . '/../conexion.php';
+require_once __DIR__ . '/../dao/PedidoDAO.php';
 require_once __DIR__ . '/../dao/InventarioDAO.php';
 
 requiere_rol(ROL_ADMIN, ROL_MESERO);
+exigir_post_con_csrf('pedidos.php');
 
+$id          = post_id('id');
+$nuevoEstado = trim(post_texto('estado'));
 
-// Solo POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-
-    mensaje_flash(
-        'error',
-        'La operación solicitada no es válida.'
-    );
-
-    redirigir('pedidos.php');
+if ($id === null) {
+    fallar('El identificador del pedido no es válido.', 'pedidos.php');
+}
+if (!in_array($nuevoEstado, [ESTADO_ENTREGADO, ESTADO_ANULADO], true)) {
+    fallar('El estado solicitado no es válido.', 'pedidos.php');
+}
+if ($nuevoEstado === ESTADO_ANULADO && !es_admin()) {
+    fallar('Solo un administrador puede anular pedidos.', 'pedidos.php');
 }
 
-// CSRF
-if (!csrf_valido(post_texto('csrf'))) {
+$pedidos = new PedidoDAO();
 
-    mensaje_flash(
-        'error',
-        'La solicitud no pudo verificarse. Recarga la página e inténtalo nuevamente.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Datos
-$id             = post_entero('id');
-$nuevoEstado    = trim(post_texto('estado'));
-
-// Validar ID
-if ($id === null || $id <= 0) {
-
-    mensaje_flash(
-        'error',
-        'El identificador del pedido no es válido.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Estados permitidos desde la interfaz
-
-$estadosPermitidos = [
-    'entregado',
-    'anulado',
-];
-
-if (!in_array($nuevoEstado, $estadosPermitidos, true)) {
-
-    mensaje_flash(
-        'error',
-        'El estado solicitado no es válido.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Validación del estado anular en pedido. Solo admin puede anualr
-if ($nuevoEstado === 'anulado' && !es_admin()) {
-
-    mensaje_flash(
-        'error',
-        'Solo un administrador puede anular pedidos.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Consultar pedido
-
-$pedido = consultar_uno(
-    'SELECT id, estado
-     FROM pedidos
-     WHERE id = ?
-     LIMIT 1',
-    [$id]
-);
-
+$pedido = $pedidos->obtenerPorId($id);
 if ($pedido === null) {
-
-    mensaje_flash(
-        'error',
-        'El pedido no existe.'
-    );
-
-    redirigir('pedidos.php');
+    fallar('El pedido no existe.', 'pedidos.php');
+}
+if ($pedido['estado'] !== ESTADO_PENDIENTE) {
+    fallar('Este pedido ya fue procesado y no puede cambiar de estado.', 'pedidos.php');
 }
 
-// Solo los pedidos pendientes pueden cambiar de estado
-
-if ($pedido['estado'] !== 'pendiente') {
-
-    mensaje_flash(
-        'error',
-        'Este pedido ya fue procesado y no puede cambiar de estado.'
-    );
-
-    redirigir('pedidos.php');
-}
-
-// Actualizar. Al anular, los insumos descontados al registrar el pedido se
-// devuelven en la misma transacción (si algo falla, no cambia nada).
-
-$inventarioDAO = new InventarioDAO();
-
-$cambiado = transaccion(
-    function () use ($id, $nuevoEstado, $inventarioDAO): bool {
-
-        // El AND estado = 'pendiente' evita devolver el stock dos veces
-        // si dos personas anulan el mismo pedido a la vez.
-        $filas = ejecutar(
-            'UPDATE pedidos
-             SET estado = ?
-             WHERE id = ?
-               AND estado = ?',
-            [
-                $nuevoEstado,
-                $id,
-                'pendiente'
-            ]
-        );
-
-        if ($filas !== 1) {
+// Al anular, el stock se devuelve en la misma transacción (si algo falla, no cambia nada)
+$inventario = new InventarioDAO();
+try {
+    $cambiado = transaccion(function () use ($id, $nuevoEstado, $pedidos, $inventario): bool {
+        if (!$pedidos->cambiarEstado($id, $nuevoEstado)) {
             return false;
         }
-
-        if ($nuevoEstado === 'anulado') {
-            $lineas = consultar(
-                'SELECT producto_id, cantidad
-                 FROM pedido_detalle
-                 WHERE pedido_id = ?',
-                [$id]
-            );
-
-            foreach ($lineas as $linea) {
-                $inventarioDAO->reponerStock(
-                    (int) $linea['producto_id'],
-                    (int) $linea['cantidad']
-                );
-            }
+        if ($nuevoEstado === ESTADO_ANULADO) {
+            $inventario->reponerStock($id);
         }
-
         return true;
+    });
+} catch (mysqli_sql_exception $e) {
+    // 1213/1205: un pedido se registraba a la vez con los mismos insumos; basta con reintentar
+    if (in_array($e->getCode(), [1205, 1213], true)) {
+        error_log('[CoffeeDesk] Estado de pedido no cambiado por concurrencia: ' . $e->getMessage());
+        fallar('Otro pedido se estaba registrando al mismo tiempo. Inténtalo nuevamente.', 'pedidos.php');
     }
-);
+    throw $e;
+}
 
 if (!$cambiado) {
-
-    mensaje_flash(
-        'error',
-        'Este pedido ya fue procesado y no puede cambiar de estado.'
-    );
-
-    redirigir('pedidos.php');
+    fallar('Este pedido ya fue procesado y no puede cambiar de estado.', 'pedidos.php');
 }
 
-// Mensaje
-
-if ($nuevoEstado === 'entregado') {
-
-    mensaje_flash(
-        'exito',
-        'El pedido #' . $id . ' fue marcado como entregado.'
-    );
-
-} else {
-
-    mensaje_flash(
-        'exito',
-        'El pedido #' . $id . ' fue anulado y su stock se devolvió al inventario.'
-    );
-}
-
-redirigir('pedidos.php');
+terminar('exito', $nuevoEstado === ESTADO_ENTREGADO
+    ? 'El pedido #' . $id . ' fue marcado como entregado.'
+    : 'El pedido #' . $id . ' fue anulado y su stock se devolvió al inventario.', 'pedidos.php');
